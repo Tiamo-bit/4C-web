@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>中国地图导航</title>
+  <style>
+    :root {
+      --paper: #f6edd9;
+      --paper-deep: #e7d3aa;
+      --paper-shadow: #d7c094;
+      --ink: #38291d;
+      --ink-soft: #6a5845;
+      --gold: #a57a3a;
+      --gold-soft: rgba(165, 122, 58, 0.18);
+      --mist: rgba(100, 126, 117, 0.18);
+      --seal: #a1432c;
+      --seal-deep: #7e301e;
+      --line: rgba(102, 79, 45, 0.22);
+      --glow: rgba(236, 214, 142, 0.88);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      min-height: 100%;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 18% 16%, rgba(255, 255, 255, 0.62), transparent 18%),
+        radial-gradient(circle at 82% 10%, rgba(255, 255, 255, 0.32), transparent 14%),
+        linear-gradient(180deg, #f9f3e4 0%, #efe2c1 52%, #e9dbb5 100%);
+      font-family: "STKaiti", "KaiTi", "Songti SC", "Noto Serif SC", serif;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background:
+        linear-gradient(rgba(111, 88, 53, 0.045) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(111, 88, 53, 0.045) 1px, transparent 1px);
+      background-size: 34px 34px;
+      mix-blend-mode: multiply;
+      opacity: 0.32;
+      pointer-events: none;
+    }
+
+    .page {
+      position: relative;
+      min-height: 100vh;
+      padding: 24px;
+      display: grid;
+      grid-template-columns: 280px minmax(0, 1fr);
+      gap: 24px;
+      align-items: center;
+    }
+
+    .page::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(circle at 12% 34%, var(--mist), transparent 16%),
+        radial-gradient(circle at 88% 16%, rgba(124, 146, 138, 0.12), transparent 14%),
+        radial-gradient(circle at 76% 86%, rgba(87, 107, 99, 0.12), transparent 16%);
+      z-index: 0;
+    }
+
+    .province-nav,
+    .map-shell,
+    .pet-button {
+      position: relative;
+      z-index: 1;
+    }
+
+    .province-nav {
+      height: min(calc(100vh - 48px), 900px);
+      padding: 18px;
+      border-radius: 28px;
+      border: 1px solid rgba(112, 84, 47, 0.18);
+      background:
+        linear-gradient(180deg, rgba(255, 251, 242, 0.92), rgba(241, 229, 198, 0.98)),
+        radial-gradient(circle at top left, rgba(255, 255, 255, 0.5), transparent 32%);
+      box-shadow:
+        0 24px 56px rgba(56, 41, 29, 0.14),
+        inset 0 1px 0 rgba(255, 255, 255, 0.55);
+      overflow: hidden;
+    }
+
+    .province-list {
+      height: 100%;
+      margin: 0;
+      padding: 0 6px 0 0;
+      list-style: none;
+      overflow-y: auto;
+      display: grid;
+      gap: 10px;
+      align-content: start;
+    }
+
+    .province-list::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .province-list::-webkit-scrollbar-thumb {
+      background: rgba(165, 122, 58, 0.22);
+      border-radius: 999px;
+    }
+
+    .province-nav-button {
+      width: 100%;
+      border: 1px solid rgba(112, 84, 47, 0.12);
+      border-radius: 16px;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0.08)),
+        rgba(165, 122, 58, 0.08);
+      color: var(--ink);
+      font: inherit;
+      font-size: 1rem;
+      line-height: 1.4;
+      text-align: left;
+      padding: 12px 16px;
+      cursor: pointer;
+      transition:
+        transform 180ms ease,
+        box-shadow 180ms ease,
+        border-color 180ms ease,
+        background 180ms ease;
+    }
+
+    .province-nav-button:hover,
+    .province-nav-button:focus-visible {
+      transform: translateY(-4px);
+      box-shadow: 0 14px 24px rgba(56, 41, 29, 0.12);
+      border-color: rgba(165, 122, 58, 0.28);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.52), rgba(255, 255, 255, 0.1)),
+        rgba(238, 219, 155, 0.28);
+      outline: none;
+    }
+
+    .map-wrap {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: calc(100vh - 48px);
+    }
+
+    .map-shell {
+      width: min(100%, 1120px);
+      padding: 18px;
+      border-radius: 28px;
+      border: 1px solid rgba(112, 84, 47, 0.18);
+      background:
+        linear-gradient(180deg, rgba(255, 251, 242, 0.9), rgba(241, 229, 198, 0.98)),
+        radial-gradient(circle at top left, rgba(255, 255, 255, 0.5), transparent 32%);
+      box-shadow:
+        0 24px 56px rgba(56, 41, 29, 0.14),
+        inset 0 1px 0 rgba(255, 255, 255, 0.55);
+    }
+
+    .map-stage {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 960 / 660;
+      border-radius: 24px;
+      overflow: hidden;
+      border: 1px solid rgba(112, 84, 47, 0.22);
+      background:
+        radial-gradient(circle at 18% 15%, rgba(255, 255, 255, 0.58), transparent 18%),
+        linear-gradient(180deg, #efe4c3, #e2d0a5);
+      box-shadow:
+        0 16px 32px rgba(56, 41, 29, 0.12),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.32);
+    }
+
+    .map-stage::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(circle at 12% 16%, rgba(89, 114, 105, 0.08), transparent 8%),
+        radial-gradient(circle at 86% 78%, rgba(149, 111, 66, 0.08), transparent 8%);
+      z-index: 1;
+    }
+
+    .map-image {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+      pointer-events: none;
+      user-select: none;
+      -webkit-user-drag: none;
+      z-index: 0;
+    }
+
+    .map-hotspots {
+      position: absolute;
+      inset: 0;
+      z-index: 2;
+    }
+
+    .province-hotspot {
+      position: absolute;
+      left: calc(var(--x) * 1%);
+      top: calc(var(--y) * 1%);
+      width: calc(var(--w) * 1%);
+      height: calc(var(--h) * 1%);
+      transform: translate(-50%, -50%);
+      border: 1px solid transparent;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.01);
+      cursor: pointer;
+      transition:
+        transform 180ms ease,
+        box-shadow 180ms ease,
+        border-color 180ms ease,
+        background 180ms ease;
+    }
+
+    .province-hotspot:hover,
+    .province-hotspot:focus-visible,
+    .province-hotspot.is-raised {
+      transform: translate(-50%, calc(-50% - 6px));
+      border-color: rgba(165, 122, 58, 0.32);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.36), rgba(255, 255, 255, 0.08)),
+        rgba(238, 219, 155, 0.14);
+      box-shadow:
+        0 14px 26px rgba(56, 41, 29, 0.14),
+        inset 0 0 0 1px rgba(255, 250, 238, 0.45);
+      outline: none;
+    }
+
+    .province-hotspot::after {
+      content: attr(data-name);
+      position: absolute;
+      left: 50%;
+      top: -10px;
+      transform: translate(-50%, -100%);
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: rgba(255, 250, 238, 0.95);
+      border: 1px solid rgba(112, 84, 47, 0.14);
+      color: var(--ink);
+      font-size: 0.92rem;
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 180ms ease, transform 180ms ease;
+      box-shadow: 0 10px 18px rgba(56, 41, 29, 0.1);
+    }
+
+    .province-hotspot:hover::after,
+    .province-hotspot:focus-visible::after,
+    .province-hotspot.is-raised::after {
+      opacity: 1;
+      transform: translate(-50%, calc(-100% - 4px));
+    }
+
+    .pet-button {
+      position: fixed;
+      right: 24px;
+      bottom: 24px;
+      z-index: 5;
+      min-width: 148px;
+      padding: 14px 18px;
+      border: 1px solid rgba(112, 84, 47, 0.18);
+      border-radius: 999px;
+      background:
+        linear-gradient(180deg, rgba(255, 251, 242, 0.95), rgba(241, 229, 198, 0.98)),
+        radial-gradient(circle at top left, rgba(255, 255, 255, 0.4), transparent 32%);
+      color: var(--ink);
+      font: inherit;
+      font-size: 0.98rem;
+      cursor: pointer;
+      box-shadow:
+        0 18px 36px rgba(56, 41, 29, 0.14),
+        inset 0 1px 0 rgba(255, 255, 255, 0.55);
+      transition: transform 180ms ease, box-shadow 180ms ease;
+    }
+
+    .pet-button:hover,
+    .pet-button:focus-visible {
+      transform: translateY(-4px);
+      box-shadow:
+        0 24px 42px rgba(56, 41, 29, 0.18),
+        inset 0 1px 0 rgba(255, 255, 255, 0.55);
+      outline: none;
+    }
+
+    @media (max-width: 1080px) {
+      .page {
+        grid-template-columns: 1fr;
+        gap: 18px;
+        padding: 18px 18px 90px;
+      }
+
+      .province-nav {
+        height: auto;
+        max-height: 240px;
+      }
+
+      .province-list {
+        grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
+      }
+
+      .map-wrap {
+        min-height: auto;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .page {
+        padding: 14px 14px 86px;
+      }
+
+      .map-shell {
+        padding: 12px;
+        border-radius: 20px;
+      }
+
+      .map-stage {
+        border-radius: 18px;
+      }
+
+      .province-hotspot {
+        border-radius: 12px;
+      }
+
+      .pet-button {
+        right: 14px;
+        bottom: 14px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <aside class="province-nav" aria-label="省份导航">
+      <ul class="province-list" id="provinceNav"></ul>
+    </aside>
+
+    <section class="map-wrap" aria-label="中国地图导航区域">
+      <div class="map-shell">
+        <div class="map-stage">
+          <img
+            class="map-image"
+            src="./official-china-map-gs2024-1234.png"
+            alt="中国标准地图 PNG"
+          >
+          <div class="map-hotspots" id="mapHotspots"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <button class="pet-button" id="petButton" type="button">选择桌宠</button>
+
+  <script>
+    const provinces = [
+      { id: "beijing", name: "北京", x: 65.8, y: 36.4, w: 6.2, h: 5.4, url: "./provinces/beijing.html" },
+      { id: "tianjin", name: "天津", x: 70.4, y: 37.7, w: 5.2, h: 4.8, url: "./provinces/tianjin.html" },
+      { id: "hebei", name: "河北", x: 66.4, y: 42.1, w: 9.2, h: 9.4, url: "./provinces/hebei.html" },
+      { id: "shanxi", name: "山西", x: 62.8, y: 44.4, w: 8.2, h: 9.4, url: "./provinces/shanxi.html" },
+      { id: "neimenggu", name: "内蒙古", x: 54.3, y: 35.8, w: 20.8, h: 10.6, url: "./provinces/neimenggu.html" },
+      { id: "liaoning", name: "辽宁", x: 73.8, y: 34.1, w: 7.8, h: 6.8, url: "./provinces/liaoning.html" },
+      { id: "jilin", name: "吉林", x: 74.1, y: 24.2, w: 7.6, h: 7.2, url: "./provinces/jilin.html" },
+      { id: "heilongjiang", name: "黑龙江", x: 78.2, y: 14.8, w: 11.8, h: 10.4, url: "./provinces/heilongjiang.html" },
+      { id: "shanghai", name: "上海", x: 76.5, y: 60.3, w: 4.8, h: 4.8, url: "./provinces/shanghai.html" },
+      { id: "jiangsu", name: "江苏", x: 71.8, y: 56.0, w: 8.4, h: 8.4, url: "./provinces/jiangsu.html" },
+      { id: "zhejiang", name: "浙江", x: 73.5, y: 68.2, w: 8.2, h: 8.8, url: "./provinces/zhejiang.html" },
+      { id: "anhui", name: "安徽", x: 67.3, y: 60.2, w: 8.8, h: 8.8, url: "./provinces/anhui.html" },
+      { id: "fujian", name: "福建", x: 69.7, y: 78.2, w: 7.2, h: 9.6, url: "./provinces/fujian.html" },
+      { id: "jiangxi", name: "江西", x: 65.0, y: 70.8, w: 8.6, h: 8.6, url: "./provinces/jiangxi.html" },
+      { id: "shandong", name: "山东", x: 72.0, y: 47.3, w: 9.2, h: 8.8, url: "./provinces/shandong.html" },
+      { id: "henan", name: "河南", x: 61.6, y: 53.9, w: 9.0, h: 8.8, url: "./provinces/henan.html" },
+      { id: "hubei", name: "湖北", x: 55.3, y: 61.0, w: 9.2, h: 8.2, url: "./provinces/hubei.html" },
+      { id: "hunan", name: "湖南", x: 56.7, y: 72.5, w: 8.8, h: 8.8, url: "./provinces/hunan.html" },
+      { id: "guangdong", name: "广东", x: 63.2, y: 83.6, w: 10.2, h: 8.2, url: "./provinces/guangdong.html" },
+      { id: "guangxi", name: "广西", x: 55.2, y: 84.1, w: 9.8, h: 8.8, url: "./provinces/guangxi.html" },
+      { id: "hainan", name: "海南", x: 55.0, y: 97.1, w: 7.8, h: 5.8, url: "./provinces/hainan.html" },
+      { id: "chongqing", name: "重庆", x: 50.9, y: 67.7, w: 8.0, h: 8.0, url: "./provinces/chongqing.html" },
+      { id: "sichuan", name: "四川", x: 41.3, y: 61.2, w: 12.6, h: 12.4, url: "./provinces/sichuan.html" },
+      { id: "guizhou", name: "贵州", x: 48.8, y: 77.2, w: 8.8, h: 8.2, url: "./provinces/guizhou.html" },
+      { id: "yunnan", name: "云南", x: 40.8, y: 82.3, w: 10.4, h: 10.8, url: "./provinces/yunnan.html" },
+      { id: "xizang", name: "西藏", x: 23.2, y: 53.2, w: 22.4, h: 16.2, url: "./provinces/xizang.html" },
+      { id: "shaanxi", name: "陕西", x: 49.9, y: 53.5, w: 8.0, h: 10.6, url: "./provinces/shaanxi.html" },
+      { id: "gansu", name: "甘肃", x: 37.3, y: 38.9, w: 14.6, h: 12.8, url: "./provinces/gansu.html" },
+      { id: "qinghai", name: "青海", x: 34.8, y: 45.0, w: 14.0, h: 12.2, url: "./provinces/qinghai.html" },
+      { id: "ningxia", name: "宁夏", x: 50.7, y: 44.7, w: 5.8, h: 5.8, url: "./provinces/ningxia.html" },
+      { id: "xinjiang", name: "新疆", x: 21.5, y: 35.6, w: 22.8, h: 18.6, url: "./provinces/xinjiang.html" },
+      { id: "taiwan", name: "台湾", x: 76.7, y: 81.2, w: 5.8, h: 8.8, url: "./provinces/taiwan.html" },
+      { id: "xianggang", name: "香港", x: 64.2, y: 87.2, w: 4.2, h: 4.6, url: "./provinces/xianggang.html" },
+      { id: "aomen", name: "澳门", x: 62.5, y: 88.4, w: 4.2, h: 4.6, url: "./provinces/aomen.html" }
+    ];
+
+    const enabledProvincePages = new Set([
+      // "beijing",
+      // "hebei",
+    ]);
+
+    const provinceNav = document.getElementById("provinceNav");
+    const mapHotspots = document.getElementById("mapHotspots");
+    const petButton = document.getElementById("petButton");
+
+    let hoverTimer = 0;
+    let lastTriggeredProvinceId = "";
+
+    function navigateToProvince(province) {
+      if (!province) return;
+      if (!enabledProvincePages.has(province.id)) {
+        window.location.hash = `province-${province.id}`;
+        return;
+      }
+      if (!province.url) return;
+      window.location.href = province.url;
+    }
+
+    function scheduleProvinceNavigation(province) {
+      if (!province || lastTriggeredProvinceId === province.id) return;
+      window.clearTimeout(hoverTimer);
+      hoverTimer = window.setTimeout(() => {
+        lastTriggeredProvinceId = province.id;
+        navigateToProvince(province);
+      }, 120);
+    }
+
+    function clearProvinceNavigation() {
+      window.clearTimeout(hoverTimer);
+      lastTriggeredProvinceId = "";
+    }
+
+    function createNavButton(province) {
+      const item = document.createElement("li");
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "province-nav-button";
+      button.textContent = province.name;
+      button.addEventListener("click", () => navigateToProvince(province));
+      item.appendChild(button);
+      return item;
+    }
+
+    function createHotspot(province) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "province-hotspot";
+      button.dataset.name = province.name;
+      button.setAttribute("aria-label", `进入${province.name}科普界面`);
+      button.style.setProperty("--x", province.x);
+      button.style.setProperty("--y", province.y);
+      button.style.setProperty("--w", province.w);
+      button.style.setProperty("--h", province.h);
+
+      const raise = () => button.classList.add("is-raised");
+      const lower = () => {
+        button.classList.remove("is-raised");
+        clearProvinceNavigation();
+      };
+
+      button.addEventListener("mouseenter", raise);
+      button.addEventListener("mousemove", () => scheduleProvinceNavigation(province));
+      button.addEventListener("mouseleave", lower);
+      button.addEventListener("focus", raise);
+      button.addEventListener("blur", lower);
+      button.addEventListener("click", () => navigateToProvince(province));
+
+      return button;
+    }
+
+    provinces.forEach((province) => {
+      provinceNav.appendChild(createNavButton(province));
+      mapHotspots.appendChild(createHotspot(province));
+    });
+
+    petButton.addEventListener("click", () => {
+      window.alert("桌宠选择按钮已预留，后续可在这里接入桌宠图像与选择逻辑。");
+    });
+  </script>
+</body>
+</html>
