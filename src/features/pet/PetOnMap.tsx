@@ -7,7 +7,7 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { useDirectionalGesture, startMediaPipeDirectionRecognizer } from "./gesture";
+import { useDirectionalGesture, startMediaPipeDirectionRecognizer } from "../gesture";
 import type {
   Direction,
   PetOnMapHandle,

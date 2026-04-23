@@ -1,6 +1,5 @@
 import type { CSSProperties } from "react";
-
-export type Direction = "up" | "down" | "left" | "right";
+export type { Direction } from "../../types/gesture";
 
 export type ProvinceNode = {
   id: string;

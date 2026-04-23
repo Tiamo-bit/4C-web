@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import type { PointerEvent as ReactPointerEvent, TouchEvent as ReactTouchEvent } from "react";
-import type { Direction } from "./petTypes";
+import type { Direction } from "../../types/gesture";
 
 export type DirectionGestureOptions = {
   enabled?: boolean;
