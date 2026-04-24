@@ -237,7 +237,11 @@ class PetMapScene extends Phaser.Scene {
       tint: [0xf2df9b, 0xc8d8ef, 0xf3e4cf],
     });
 
-    const emitter = particles.createEmitter({
+    const emitter = (particles as unknown as {
+      createEmitter: (
+        config: Phaser.Types.GameObjects.Particles.ParticleEmitterConfig,
+      ) => Phaser.GameObjects.Particles.ParticleEmitter;
+    }).createEmitter({
       follow: this.petSprite,
       followOffset: { x: 0, y: 20 },
       lifespan: 1000,
@@ -272,7 +276,7 @@ class PetMapScene extends Phaser.Scene {
     const node = this.nodesById.get(provinceId);
     if (!node || !this.petSprite) return;
     this.petSprite.setPosition(node.x, node.y - 34);
-    this.particleEmitter?.setFollow(this.petSprite);
+    this.particleEmitter?.startFollow(this.petSprite);
     this.updateMarkerHighlights();
     this.syncState();
   }
@@ -344,13 +348,13 @@ class PetMapScene extends Phaser.Scene {
     const targetY = target.y - 34;
     const arcHeight = -42;
 
-    this.tweens.addCounter({
+      this.tweens.addCounter({
       from: 0,
       to: 1,
       duration: 620,
       ease: "Sine.inOut",
       onUpdate: (tween) => {
-        const progress = tween.getValue();
+        const progress = tween.getValue() ?? 0;
         const x = Phaser.Math.Linear(startX, targetX, progress);
         const y = Phaser.Math.Linear(startY, targetY, progress) + Math.sin(progress * Math.PI) * arcHeight;
         this.petSprite?.setPosition(x, y);
@@ -492,11 +496,11 @@ export const PetOnMap = forwardRef<PetOnMapHandle, PetOnMapProps>(function PetOn
 
   useEffect(() => {
     const current = sceneRef.current;
-    if (!current || gestureMode === "pointer") return;
+    if (!current) return;
 
     let stopped = false;
     const bootCamera = async () => {
-      if (!enableCamera || gestureMode === "pointer" || !videoRef.current) {
+      if (!enableCamera || !videoRef.current) {
         setCameraStatus("fallback");
         return;
       }
