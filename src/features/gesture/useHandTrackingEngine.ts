@@ -36,8 +36,8 @@ export function useHandTrackingEngine(videoElement: HTMLVideoElement | null) {
         const baseUrl = import.meta.env.BASE_URL;
 
         // 使用 URL 对象将其转换为标准的绝对路径，确保末尾斜杠和域名完整
-        const wasmPath = new URL(`${baseUrl}wasm`, window.location.origin).toString();
-        const modelPath = new URL(`${baseUrl}models/hand_landmarker.task`, window.location.origin).toString();
+        const wasmPath = `${baseUrl}wasm`;
+        const modelPath = `${baseUrl}models/hand_landmarker.task`;
 
         // 1. 初始化 WASM 运行库
         const vision = await FilesetResolver.forVisionTasks(wasmPath);
