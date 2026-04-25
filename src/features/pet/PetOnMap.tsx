@@ -7,6 +7,8 @@ import React, {
   useRef,
   useState,
 } from "react";
+import chinaMapUrl from "../map/official-china-map-gs2024-1234.png";
+import { useNavigate } from "react-router-dom";
 import { useDirectionalGesture, startMediaPipeDirectionRecognizer } from "./gesture";
 import type {
   Direction,
@@ -61,6 +63,7 @@ class PetMapScene extends Phaser.Scene {
   private markers = new Map<string, Phaser.GameObjects.Container>();
   private labels = new Map<string, Phaser.GameObjects.Text>();
   private isMoving = false;
+  private floatTween?: Phaser.Tweens.Tween;
 
   constructor(params: PetMapSceneParams) {
     super("PetMapScene");
@@ -72,6 +75,10 @@ class PetMapScene extends Phaser.Scene {
     this.onStateChange = params.onStateChange;
     this.onProvinceEnter = params.onProvinceEnter;
     this.onReady = params.onReady;
+  }
+
+  preload() {
+    this.load.image('china-map', chinaMapUrl);
   }
 
   create() {
@@ -87,19 +94,10 @@ class PetMapScene extends Phaser.Scene {
 
   private drawBackdrop() {
     const { width, height } = this.scale;
-    const bg = this.add.graphics();
-    bg.fillStyle(0xf4ecdf, 1);
-    bg.fillRect(0, 0, width, height);
-    bg.lineStyle(1, 0xcbbba1, 0.8);
-    for (let i = 0; i < 8; i += 1) {
-      const y = 40 + i * ((height - 80) / 7);
-      bg.beginPath();
-      bg.moveTo(30, y);
-      bg.lineTo(width - 30, y + Math.sin(i) * 6);
-      bg.strokePath();
-    }
-    bg.fillStyle(0xeddfc8, 0.55);
-    bg.fillRoundedRect(18, 18, width - 36, height - 36, 28);
+    const mapImg = this.add.image(width / 2, height / 2, 'china-map');
+    // 自动适配比例并居中
+    const scale = Math.min(width / mapImg.width, height / mapImg.height) * 0.9;
+    mapImg.setScale(scale);
   }
 
   private createTextures() {
@@ -191,6 +189,18 @@ class PetMapScene extends Phaser.Scene {
     });
   }
 
+  private startFloatAnimation() {
+    if (this.floatTween) this.floatTween.stop();
+    this.floatTween = this.tweens.add({
+      targets: this.petSprite,
+      y: this.petSprite!.y - 6,
+      duration: 900,
+      yoyo: true,
+      repeat: -1,
+      ease: "Sine.inOut",
+    });
+  }
+
   private createPet() {
     const node = this.nodesById.get(this.currentNodeId) ?? this.nodes[0];
     this.petSprite = this.add.image(node.x, node.y - 34, `pet-skin-${this.currentSkinId}`);
@@ -203,14 +213,7 @@ class PetMapScene extends Phaser.Scene {
       this.onProvinceEnter?.(this.currentNodeId);
     });
 
-    this.tweens.add({
-      targets: this.petSprite,
-      y: this.petSprite.y - 6,
-      duration: 900,
-      yoyo: true,
-      repeat: -1,
-      ease: "Sine.inOut",
-    });
+    this.startFloatAnimation();
 
     this.tweens.add({
       targets: this.petSprite,
@@ -223,25 +226,7 @@ class PetMapScene extends Phaser.Scene {
   }
 
   private createParticles() {
-    const particles = this.add.particles(0, 0, "spark-dot", {
-      x: 0,
-      y: 0,
-      lifespan: { min: 900, max: 1500 },
-      speedX: { min: -18, max: 18 },
-      speedY: { min: -24, max: 24 },
-      scale: { start: 0.45, end: 0 },
-      alpha: { start: 0.58, end: 0 },
-      frequency: 90,
-      quantity: 1,
-      blendMode: "ADD",
-      tint: [0xf2df9b, 0xc8d8ef, 0xf3e4cf],
-    });
-
-    const emitter = (particles as unknown as {
-      createEmitter: (
-        config: Phaser.Types.GameObjects.Particles.ParticleEmitterConfig,
-      ) => Phaser.GameObjects.Particles.ParticleEmitter;
-    }).createEmitter({
+    this.particleEmitter = this.add.particles(0, 0, "spark-dot", {
       follow: this.petSprite,
       followOffset: { x: 0, y: 20 },
       lifespan: 1000,
@@ -252,7 +237,6 @@ class PetMapScene extends Phaser.Scene {
       quantity: 1,
       blendMode: "ADD",
     });
-    this.particleEmitter = emitter;
   }
 
   private bindSceneEvents() {
@@ -342,6 +326,7 @@ class PetMapScene extends Phaser.Scene {
     }
 
     this.isMoving = true;
+    this.floatTween?.stop();
     const startX = this.petSprite.x;
     const startY = this.petSprite.y;
     const targetX = target.x;
@@ -362,6 +347,7 @@ class PetMapScene extends Phaser.Scene {
       onComplete: () => {
         this.isMoving = false;
         this.setCurrentProvince(target.id);
+        this.startFloatAnimation();
         if (triggerEnter) this.onProvinceEnter?.(target.id);
       },
     });
@@ -397,6 +383,7 @@ export const PetOnMap = forwardRef<PetOnMapHandle, PetOnMapProps>(function PetOn
   },
   ref,
 ) {
+  const navigate = useNavigate();
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const phaserHostRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -448,7 +435,10 @@ export const PetOnMap = forwardRef<PetOnMapHandle, PetOnMapProps>(function PetOn
         setState(nextState);
         onStateChange?.(nextState);
       },
-      onProvinceEnter,
+      onProvinceEnter: (provinceId) => {
+        onProvinceEnter?.(provinceId);
+        navigate('/province/' + provinceId);
+      },
       onReady: (createdScene) => {
         sceneRef.current = createdScene;
       },
@@ -477,9 +467,9 @@ export const PetOnMap = forwardRef<PetOnMapHandle, PetOnMapProps>(function PetOn
     onReady?.({
       getCurrentProvinceId: () => scene.getCurrentProvinceId(),
       getPosition: () => scene.getPosition(),
-      moveByDirection: (direction) => scene.events.emit("move-direction", direction),
-      setSkin: (skinId) => scene.events.emit("change-skin", skinId),
-      moveToProvince: (provinceId) => scene.events.emit("move-province", provinceId),
+      moveByDirection: (direction) => scene.events?.emit("move-direction", direction),
+      setSkin: (skinId) => scene.events?.emit("change-skin", skinId),
+      moveToProvince: (provinceId) => scene.events?.emit("move-province", provinceId),
     });
 
     return () => {
@@ -490,7 +480,7 @@ export const PetOnMap = forwardRef<PetOnMapHandle, PetOnMapProps>(function PetOn
   }, [initialProvinceId, nodes, onProvinceEnter, onReady, onStateChange, skins]);
 
   useEffect(() => {
-    if (!sceneRef.current) return;
+    if (!sceneRef.current || !sceneRef.current.events) return;
     sceneRef.current.events.emit("change-skin", selectedSkinId);
   }, [selectedSkinId]);
 
