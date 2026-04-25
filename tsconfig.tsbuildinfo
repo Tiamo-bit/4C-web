@@ -1,1 +1,5 @@
+<<<<<<< HEAD
 {"root":["./src/app.tsx","./src/main.tsx","./src/vite-env.d.ts","./src/components/navbar.tsx","./src/components/phasergame.tsx","./src/features/camera/usecamerastream.ts","./src/features/gesture/usehandtrackingengine.ts","./src/features/pet/petonmap.tsx","./src/features/pet/gesture.ts","./src/features/pet/index.ts","./src/features/pet/pettypes.ts","./src/features/puzzle/puzzlescene.ts","./src/pages/homepage.tsx","./src/pages/mappage.tsx","./src/pages/provincedetailpage.tsx","./src/pages/puzzlepage.tsx","./src/store/usegesturestore.ts"],"version":"5.9.3"}
+=======
+{"root":["./src/app.tsx","./src/main.tsx","./src/vite-env.d.ts","./src/components/phasergame.tsx","./src/features/camera/usecamerastream.ts","./src/features/gesture/usehandtrackingengine.ts","./src/features/pet/petonmap.tsx","./src/features/pet/gesture.ts","./src/features/pet/index.ts","./src/features/pet/pettypes.ts","./src/features/puzzle/puzzlescene.ts","./src/store/usegesturestore.ts"],"version":"5.9.3"}
+>>>>>>> origin/wuqimahei
