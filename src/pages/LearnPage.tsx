@@ -178,9 +178,10 @@ export default function LearnPage() {
       <motion.div
         ref={cardRef}
         className="learn-card"
-        initial={{ opacity: 0, y: 40 }}
-        animate={cardInView ? { opacity: 1, y: 0 } : {}}
+        initial={{ opacity: 0, y: 40, scale: 1.25 }}
+        animate={cardInView ? { opacity: 1, y: 0, scale: 1.25 } : {}}
         transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+        style={{ transformOrigin: 'top center', margin: '40px auto' }}
       >
         <div className="learn-card__header">
           <span className="learn-card__icon">🏷️</span>

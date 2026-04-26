@@ -100,21 +100,16 @@ body::before {
   border: 1px solid rgba(112, 84, 47, 0.26);
   background:
     linear-gradient(148deg, rgba(255, 244, 212, 0.9), rgba(198, 147, 86, 0.92)),
-    repeating-linear-gradient(
-      16deg,
+    repeating-linear-gradient(16deg,
       rgba(92, 57, 25, 0.22) 0px,
       rgba(92, 57, 25, 0.22) 2px,
       rgba(208, 165, 106, 0.08) 2px,
-      rgba(208, 165, 106, 0.08) 7px
-    );
+      rgba(208, 165, 106, 0.08) 7px);
   box-shadow:
     0 16px 34px rgba(56, 41, 29, 0.18),
     inset 0 0 0 1px rgba(255, 250, 238, 0.38);
-  transform: translate(
-      calc(-50% + var(--start-x)),
-      calc(-50% + var(--start-y))
-    )
-    rotate(var(--start-rotate));
+  transform: translate(calc(-50% + var(--start-x)),
+      calc(-50% + var(--start-y))) rotate(var(--start-rotate));
   animation: floatPiece 2s ease-in-out infinite;
 }
 
@@ -140,11 +135,8 @@ body::before {
 .phase-fade .mortise-piece {
   animation: none;
   transition: transform 320ms ease-in-out, filter 320ms ease-in-out;
-  transform: translate(
-      calc(-50% + var(--final-x)),
-      calc(-50% + var(--final-y))
-    )
-    rotate(var(--final-rotate));
+  transform: translate(calc(-50% + var(--final-x)),
+      calc(-50% + var(--final-y))) rotate(var(--final-rotate));
 }
 
 .phase-lock .mortise-piece,
@@ -595,28 +587,18 @@ body::before {
 
 @keyframes floatPiece {
   0% {
-    transform: translate(
-        calc(-50% + var(--start-x)),
-        calc(-50% + var(--start-y))
-      )
-      rotate(var(--start-rotate))
-      translateY(-3px);
+    transform: translate(calc(-50% + var(--start-x)),
+        calc(-50% + var(--start-y))) rotate(var(--start-rotate)) translateY(-3px);
   }
+
   50% {
-    transform: translate(
-        calc(-50% + var(--start-x)),
-        calc(-50% + var(--start-y))
-      )
-      rotate(var(--start-rotate))
-      translateY(5px);
+    transform: translate(calc(-50% + var(--start-x)),
+        calc(-50% + var(--start-y))) rotate(var(--start-rotate)) translateY(5px);
   }
+
   100% {
-    transform: translate(
-        calc(-50% + var(--start-x)),
-        calc(-50% + var(--start-y))
-      )
-      rotate(var(--start-rotate))
-      translateY(-3px);
+    transform: translate(calc(-50% + var(--start-x)),
+        calc(-50% + var(--start-y))) rotate(var(--start-rotate)) translateY(-3px);
   }
 }
 
@@ -624,9 +606,11 @@ body::before {
   0% {
     transform: scale(1);
   }
+
   55% {
     transform: scale(0.985);
   }
+
   100% {
     transform: scale(1);
   }
@@ -637,9 +621,11 @@ body::before {
     opacity: 0;
     transform: translate(0, 0) scale(0.3);
   }
+
   15% {
     opacity: 1;
   }
+
   100% {
     opacity: 0;
     transform: translate(var(--dx), var(--dy)) scale(1);
@@ -859,12 +845,10 @@ body::before {
 .hub-section__overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(
-    180deg,
-    rgba(244, 236, 223, 0.3) 0%,
-    rgba(244, 236, 223, 0.1) 40%,
-    rgba(26, 21, 18, 0.4) 100%
-  );
+  background: linear-gradient(180deg,
+      rgba(244, 236, 223, 0.3) 0%,
+      rgba(244, 236, 223, 0.1) 40%,
+      rgba(26, 21, 18, 0.4) 100%);
   z-index: 1;
 }
 
@@ -1284,12 +1268,10 @@ body::before {
 .learn-section__divider {
   height: 2px;
   margin-bottom: 28px;
-  background: linear-gradient(
-    90deg,
-    var(--gold) 0%,
-    rgba(165, 122, 58, 0.4) 50%,
-    transparent 100%
-  );
+  background: linear-gradient(90deg,
+      var(--gold) 0%,
+      rgba(165, 122, 58, 0.4) 50%,
+      transparent 100%);
   transform-origin: left center;
 }
 

@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, useScroll, useTransform, AnimatePresence, useMotionValue, useSpring } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import RevealParagraph from '../components/RevealParagraph';
+
 
 // 导入实景素材
 import bgSunmao from '../assets/images/home-hero/sunmao.png';
@@ -227,27 +228,28 @@ const HAS_DATA = new Set([
 /* 三屏宣传文案 */
 const HERO_SECTIONS = [
   {
-    text: '榫卯之间，承载千年智慧\n从雕梁画栋到琼楼玉宇\n每一根梁柱都是匠人与天地的对话',
+    text: '榫卯之间\n承载千年智慧\n从雕梁画栋到琼楼玉宇\n每一根梁柱都是匠人与天地的对话',
     bgImage: bgSunmao,
     align: 'flex-end',
     overlay: 'linear-gradient(to left, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0) 60%)',
-    offset: { x: 18, y: -2 }
+    offset: { x: -10, y: -2 }
   },
   {
-    text: '穹顶之下，承载万古祈年\n从天圆地方到礼乐昭彰\n每一重飞檐都是华夏与苍穹的共鸣',
+    text: '穹顶之下\n承载万古祈年\n从天圆地方到礼乐昭彰\n每一重飞檐都是华夏与苍穹的共鸣',
     bgImage: bgTiantan,
     align: 'flex-start',
     overlay: 'linear-gradient(to right, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0) 60%)',
     offset: { x: 5, y: 0 }
   },
   {
-    text: '水岸之间，承载千年烟火\n从吊脚飞檐到临水人家\n每一根悬柱都是烟火与山水的相融',
+    text: '水岸之间\n承载千年烟火\n从吊脚飞檐到临水人家\n每一根悬柱都是烟火与山水的相融',
     bgImage: bgZhulou,
     align: 'center',
     overlay: 'linear-gradient(to top, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0) 50%)',
     offset: { x: 0, y: 15 }
   },
 ];
+
 
 
 
@@ -397,8 +399,16 @@ const HubPhase = () => {
                 backgroundImage: `url(${section.bgImage})`,
                 y: useTransform(scrollYProgress, [i / 3, (i + 1) / 3], ['0%', '-12%']),
                 filter: 'brightness(0.85)',
+                height: '115%', // 增加高度防止向上滚动时底部漏底
+                top: 0,
+                left: 0,
+                width: '100%',
+                position: 'absolute',
+                backgroundSize: 'cover',
+                backgroundPosition: 'center'
               }}
             />
+
 
             {/* 智能遮罩层 */}
             <div style={{
@@ -534,11 +544,23 @@ const HubPhase = () => {
 // ==========================================
 // AI辅助生成： [Kimi K2.5] , 2026-04-05
 export default function HomePage() {
-  const [isIntro, setIsIntro] = useState(true);
+  const location = useLocation();
+  const [isIntro, setIsIntro] = useState(() => !location.search.includes('skipIntro=true'));
   const [doorClosing, setDoorClosing] = useState(false);
   const [doorOpening, setDoorOpening] = useState(false);
 
+  // 监听路由参数，支持动态跳过开场动画
+  useEffect(() => {
+    if (location.search.includes('skipIntro=true')) {
+      setIsIntro(false);
+    } else if (location.search === '') {
+      // 如果没有参数，默认展示 Intro（或者保持现状）
+      // setIsIntro(true); 
+    }
+  }, [location.search]);
+
   const handleTransition = () => {
+
     setDoorClosing(true);
     setTimeout(() => {
       setIsIntro(false);
@@ -551,7 +573,7 @@ export default function HomePage() {
   return (
     <div style={{ width: '100vw', minHeight: '100vh', backgroundColor: '#F4ECDF', position: 'relative', overflow: 'hidden' }}>
       <style>
-        {`@import url('https://fonts.googleapis.com/css2?family=Zhi+Mang+Xing&display=swap');
+        {`
           .no-scroll::-webkit-scrollbar { display: none; }
           .no-scroll { -ms-overflow-style: none; scrollbar-width: none; }
         `}
