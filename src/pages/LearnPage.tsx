@@ -1,3 +1,4 @@
+// AI辅助生成： [DeepSeek-V4-Pro] , 2026-04-26
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, useInView } from 'framer-motion';
@@ -5,7 +6,7 @@ import { PROVINCE_CONTENT } from '../data/provinces';
 import RevealText from '../components/RevealText';
 import RevealParagraph from '../components/RevealParagraph';
 
-/* ────────────────────── 默认兜底数据 ────────────────────── */
+/* 兜底数据 */
 const DEFAULT_CONTENT = {
   name: '未知地域',
   arch: '神秘古建',
@@ -20,7 +21,7 @@ const DEFAULT_CONTENT = {
   totalPieces: 9,
 };
 
-/* ─── 动态获取省份实景图 ─── */
+/* 动态获取省份实景图*/
 function getPhotoUrl(id: string): string {
   try {
     return new URL(`../assets/buildings/${id}/photo.png`, import.meta.url).href;
@@ -29,7 +30,7 @@ function getPhotoUrl(id: string): string {
   }
 }
 
-/* ────────────── 章节组件：标题 + 正文 (scroll-triggered) ────────────── */
+/* 章节组件：标题 + 正文 (scroll-triggered) */
 function NarrativeSection({ section, index }: { section: { title: string; body: string }; index: number }) {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: '-8% 0px' });
@@ -63,7 +64,7 @@ function NarrativeSection({ section, index }: { section: { title: string; body: 
   );
 }
 
-/* ────────────────────────── 主页面 ────────────────────────── */
+/*主页面*/
 export default function LearnPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -119,7 +120,7 @@ export default function LearnPage() {
 
   return (
     <div className="learn-page">
-      {/* ═══ 实景背景层（固定 + 虚化 + 渐显） ═══ */}
+      {/*实景背景层（固定 + 虚化 + 渐显）*/}
       <motion.div
         className="learn-page__bg"
         style={{ backgroundImage: `url(${photoUrl})` }}
@@ -128,10 +129,10 @@ export default function LearnPage() {
         transition={{ duration: 1.5, ease: 'easeOut' }}
       />
 
-      {/* ═══ 噪声纹理层 ═══ */}
+      {/* 噪声纹理层*/}
       <div className="learn-page__noise" />
 
-      {/* ═══════════ Hero 区域 ═══════════ */}
+      {/* Hero 区域 */}
       <header ref={heroRef} className="learn-hero">
         <div className="learn-hero__inner">
           <motion.div
@@ -173,7 +174,7 @@ export default function LearnPage() {
         </div>
       </header>
 
-      {/* ═══════════ 建筑名片 ═══════════ */}
+      {/* 建筑名片*/}
       <motion.div
         ref={cardRef}
         className="learn-card"
@@ -188,14 +189,14 @@ export default function LearnPage() {
         <p className="learn-card__text">{content.card}</p>
       </motion.div>
 
-      {/* ═══════════ 叙事章节（身世溯源 / 建筑亮点 / 历史高光） ═══════════ */}
+      {/* 叙事章节（身世溯源 / 建筑亮点 / 历史高光） */}
       <div className="learn-narrative">
         {content.sections.map((section, index) => (
           <NarrativeSection key={index} section={section} index={index} />
         ))}
       </div>
 
-      {/* ═══════════ 底部操作区 ═══════════ */}
+      {/* 底部操作区*/}
       <motion.footer
         ref={footerRef}
         className="learn-footer"

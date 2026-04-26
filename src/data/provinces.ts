@@ -1,3 +1,4 @@
+// AI辅助生成： [你的AI模型] , 2026-03-25
 export const PROVINCE_CONTENT: Record<string, {
   card: string;
   name: string;

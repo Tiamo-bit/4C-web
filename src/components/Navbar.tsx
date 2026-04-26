@@ -1,3 +1,4 @@
+// AI辅助生成： [你的AI模型] , 2026-03-30
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 

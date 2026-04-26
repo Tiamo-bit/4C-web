@@ -3,6 +3,12 @@ import { motion, useScroll, useTransform, AnimatePresence, useMotionValue, useSp
 import { useNavigate } from 'react-router-dom';
 import RevealParagraph from '../components/RevealParagraph';
 
+// 导入实景素材
+import bgSunmao from '../assets/images/home-hero/sunmao.png';
+import bgTiantan from '../assets/images/home-hero/tiantan.png';
+import bgZhulou from '../assets/images/home-hero/zhulou.png';
+
+
 const ARCH_TERMS = ['京派四合院', '晋商大院', '陕北窑洞', '陇东地坑院', '苏式园林', '徽派粉墙黛瓦', '浙派台门院落', '闽南红砖古厝', '客家土楼', '川西吊脚楼', '傣家竹楼', '藏式碉房', '侗寨鼓楼', '蒙古包'];
 
 
@@ -48,7 +54,7 @@ const UnitCube = ({ transforms, isBacking }: any) => {
 }
 
 // ==========================================
-// 阶段一：开场动画 (六通解构 -> 红底竖排牌匾)
+// 阶段一：开场动画 (六通解构 -> 竖排牌匾)
 // ==========================================
 const IntroPhase = ({ onEnterHub }: { onEnterHub: () => void }) => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -58,6 +64,7 @@ const IntroPhase = ({ onEnterHub }: { onEnterHub: () => void }) => {
   const globalRotateX = useTransform(scrollYProgress, steps, [-35, -35, -15, 0, 0]);
   const globalRotateY = useTransform(scrollYProgress, steps, [45, 45, 20, 0, 0]);
 
+  // AI辅助优化： [doubao-seed-2-0-pro-260215] , 2026-04-05
   // 【修复】：真正的 X, Y, Z 三轴六根木柱建模，构成孔明锁六通
 
   // b1: X轴(横向) 前上 -> 牌匾上边框
@@ -121,7 +128,8 @@ const IntroPhase = ({ onEnterHub }: { onEnterHub: () => void }) => {
   };
 
   // 文字显现：木构件消失后，文字浮现
-  // 文字显现：用 React state 驱动，彻底绕开 framer-motion 的隐式 transform
+  // 此部分由团队成员人工撰写
+  // 文字显现：用 React state 驱动
   const [textVisible, setTextVisible] = useState(false);
   useEffect(() => {
     const unsubscribe = scrollYProgress.on('change', (v) => {
@@ -146,7 +154,8 @@ const IntroPhase = ({ onEnterHub }: { onEnterHub: () => void }) => {
           </motion.div>
 
           {/* 
-            "中国古代建筑" 文字 —— 用纯 <div> 渲染，不使用 motion.div，
+            此部分由团队成员人工撰写
+            "中国古代建筑" 文字 —— 用纯 <div> 渲染
             放在 sticky 容器内部、preserve-3d 外部，用 z-index 压在 3D 场景上方
           */}
           <div
@@ -215,22 +224,34 @@ const HAS_DATA = new Set([
   'yunnan', 'xizang', 'shaanxi', 'gansu', 'qinghai', 'ningxia', 'xinjiang'
 ]);
 
-/* 三屏宣传文案（可配置） */
+/* 三屏宣传文案 */
 const HERO_SECTIONS = [
   {
-    text: '榫卯之间，承载千年智慧\n从北国琉璃到南疆竹楼，每一根梁柱都是匠人与天地的对话',
-    bgImage: '', // 空 = 占位
+    text: '榫卯之间，承载千年智慧\n从雕梁画栋到琼楼玉宇\n每一根梁柱都是匠人与天地的对话',
+    bgImage: bgSunmao,
+    align: 'flex-end',
+    overlay: 'linear-gradient(to left, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0) 60%)',
+    offset: { x: 18, y: -2 }
   },
   {
-    text: '三十一处营造遗珍\n跨越山河，探寻散落在华夏大地上的建筑基因图谱',
-    bgImage: '',
+    text: '穹顶之下，承载万古祈年\n从天圆地方到礼乐昭彰\n每一重飞檐都是华夏与苍穹的共鸣',
+    bgImage: bgTiantan,
+    align: 'flex-start',
+    overlay: 'linear-gradient(to right, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0) 60%)',
+    offset: { x: 5, y: 0 }
   },
   {
-    text: '以古法拼合，复原千年造物\n从碎片到全貌，亲手重组中国古代建筑的营造密码',
-    bgImage: '',
+    text: '水岸之间，承载千年烟火\n从吊脚飞檐到临水人家\n每一根悬柱都是烟火与山水的相融',
+    bgImage: bgZhulou,
+    align: 'center',
+    overlay: 'linear-gradient(to top, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0) 50%)',
+    offset: { x: 0, y: 15 }
   },
 ];
 
+
+
+// AI辅助生成： [Qwen3.6-35B-A3B] , 2026-04-17
 const HubPhase = () => {
   const navigate = useNavigate();
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -289,7 +310,7 @@ const HubPhase = () => {
 
   return (
     <>
-      {/* ═══════ 固定导航栏 ═══════ */}
+      {/* 固定导航栏*/}
       <nav className="hub-navbar">
         <div className="hub-navbar__inner" style={{ flexDirection: 'column', gap: '4px', padding: '8px 40px' }}>
           {/* 网站主标题 */}
@@ -324,7 +345,7 @@ const HubPhase = () => {
         </div>
       </nav>
 
-      {/* ═══════ Mega Menu 省份网格 ═══════ */}
+      {/*Mega Menu 省份网格*/}
       <AnimatePresence>
         {showMegaMenu && (
           <motion.div
@@ -365,37 +386,60 @@ const HubPhase = () => {
         )}
       </AnimatePresence>
 
-      {/* ═══════ 全屏 Scroll-Snap 区域 ═══════ */}
+      {/*  全屏 Scroll-Snap 区域 */}
       <div ref={scrollRef} className="hub-scroll-container">
-        {HERO_SECTIONS.map((section, i) => (
+        {HERO_SECTIONS.map((section: any, i) => (
           <section key={i} className="hub-section">
-            {/* 背景层（有图用图，无图占位） */}
-            {section.bgImage ? (
+            {/* 背景层 - 使用 scrollYProgress 去除惯性 */}
+            <motion.div
+              className="hub-section__bg"
+              style={{
+                backgroundImage: `url(${section.bgImage})`,
+                y: useTransform(scrollYProgress, [i / 3, (i + 1) / 3], ['0%', '-12%']),
+                filter: 'brightness(0.85)',
+              }}
+            />
+
+            {/* 智能遮罩层 */}
+            <div style={{
+              position: 'absolute',
+              inset: 0,
+              background: section.overlay,
+              zIndex: 2,
+            }} />
+
+            {/* 文案层 - 支持手动 Offset 调整 */}
+            <div className="hub-section__content" style={{
+              display: 'flex',
+              justifyContent: section.align,
+              alignItems: 'center',
+              padding: '0 12%',
+              zIndex: 3,
+              transform: `translate(${section.offset.x}%, ${section.offset.y}%)`,
+              textAlign: section.align === 'center' ? 'center' : 'left' as any,
+            }}>
               <motion.div
-                className="hub-section__bg"
-                style={{
-                  backgroundImage: `url(${section.bgImage})`,
-                  y: useTransform(springY, [i / 3, (i + 1) / 3], ['0%', '-10%']),
-                }}
-              />
-            ) : (
-              <div className="hub-section__bg hub-section__bg--placeholder">
-                <span className="hub-section__placeholder-text">实景素材待载入</span>
-              </div>
-            )}
+                initial={{ opacity: 0, y: 40 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: false, margin: "-20%" }}
+                transition={{ duration: 1, ease: [0.16, 1, 0.3, 1] }}
+                style={{ maxWidth: '800px' }}
+              >
+                {section.text.split('\n').map((line: string, lineIdx: number) => (
+                  <div key={lineIdx} style={{ marginBottom: lineIdx < 3 ? '0.8rem' : 0 }}>
+                    <RevealParagraph text={line} fontSize={section.fontSize} />
+                  </div>
+                ))}
 
-            {/* 遮罩层 */}
-            <div className="hub-section__overlay" />
-
-            {/* 文案层 */}
-            <div className="hub-section__content">
-              <RevealParagraph text={section.text} />
+              </motion.div>
             </div>
           </section>
         ))}
+
+
       </div>
 
-      {/* ═══════ 营造图鉴 Overlay ═══════ */}
+      {/* 营造图鉴 Overlay */}
       <AnimatePresence>
         {showCollection && (
           <motion.div
@@ -488,6 +532,7 @@ const HubPhase = () => {
 // ==========================================
 // 主容器
 // ==========================================
+// AI辅助生成： [Kimi K2.5] , 2026-04-05
 export default function HomePage() {
   const [isIntro, setIsIntro] = useState(true);
   const [doorClosing, setDoorClosing] = useState(false);
@@ -515,19 +560,30 @@ export default function HomePage() {
       {/* 噪点底纹 */}
       <div style={{ position: 'fixed', inset: 0, zIndex: 0, opacity: 0.05, mixBlendMode: 'multiply', pointerEvents: 'none', backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")` }} />
 
-      {/* 常驻水墨字 */}
-      <div style={{ position: 'fixed', inset: 0, zIndex: 1, pointerEvents: 'none' }}>
-        {ARCH_POSITIONS.map((item, idx) => (
+      {/* 常驻水墨字 - 仅在 Intro 阶段显示，带淡出效果 */}
+      <AnimatePresence>
+        {isIntro && (
           <motion.div
-            key={idx}
-            initial={{ opacity: 0 }} animate={{ opacity: 0.4, y: ['100vh', '-100vh'] }}
-            transition={{ opacity: { duration: 2, ease: "easeOut" }, y: { duration: item.duration, delay: item.delay, repeat: Infinity, ease: 'linear' } }}
-            style={{ position: 'absolute', writingMode: 'vertical-rl', fontFamily: '"Zhi Mang Xing", cursive', fontSize: `${item.size}rem`, color: '#1A1512', filter: `blur(${item.blur}px)`, left: `${item.startX}vw`, textShadow: '2px 4px 10px rgba(26, 21, 18, 0.3)', whiteSpace: 'nowrap' }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 1.5 }}
+            style={{ position: 'fixed', inset: 0, zIndex: 1, pointerEvents: 'none' }}
           >
-            {item.term}
+            {ARCH_POSITIONS.map((item, idx) => (
+              <motion.div
+                key={idx}
+                initial={{ opacity: 0 }} animate={{ opacity: 0.4, y: ['100vh', '-100vh'] }}
+                transition={{ opacity: { duration: 2, ease: "easeOut" }, y: { duration: item.duration, delay: item.delay, repeat: Infinity, ease: 'linear' } }}
+                style={{ position: 'absolute', writingMode: 'vertical-rl', fontFamily: '"Zhi Mang Xing", cursive', fontSize: `${item.size}rem`, color: '#1A1512', filter: `blur(${item.blur}px)`, left: `${item.startX}vw`, textShadow: '2px 4px 10px rgba(26, 21, 18, 0.3)', whiteSpace: 'nowrap' }}
+              >
+                {item.term}
+              </motion.div>
+            ))}
           </motion.div>
-        ))}
-      </div>
+        )}
+      </AnimatePresence>
+
 
       {isIntro ? <IntroPhase onEnterHub={handleTransition} /> : <HubPhase />}
 
