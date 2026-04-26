@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import RevealParagraph from '../components/RevealParagraph';
 
 const PROVINCE_INFO: Record<string, { name: string, arch: string, desc: string, totalPieces: number }> = {
   beijing: { name: "北京", arch: "故宫太和殿", desc: "中国现存最大的木结构宫殿建筑，代表了中国古代建筑的最高规格与工艺水平。", totalPieces: 6 },
@@ -34,7 +35,7 @@ export default function LearnPage() {
 
   const handleStudy = () => {
     if (progress >= 100) return;
-    
+
     const step = 100 / info.totalPieces;
     const newProgress = Math.min(100, progress + step);
     setProgress(newProgress);
@@ -51,9 +52,9 @@ export default function LearnPage() {
 
   return (
     <div style={{ width: '100vw', minHeight: '100vh', background: '#F4ECDF', paddingTop: '64px', boxSizing: 'border-box', display: 'flex', flexDirection: 'column' }}>
-      
+
       {/* 底层纹理 */}
-      <div 
+      <div
         style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 0,
           opacity: 0.05, mixBlendMode: 'multiply', pointerEvents: 'none',
@@ -62,7 +63,7 @@ export default function LearnPage() {
       />
 
       <div style={{ flex: 1, display: 'flex', padding: '60px', gap: '60px', position: 'relative', zIndex: 10 }}>
-        
+
         {/* 左侧文字区 */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
           <h1 style={{ fontSize: '3.5rem', color: '#1A1512', marginBottom: '16px', fontFamily: '"Zhi Mang Xing", cursive' }}>{info.arch}</h1>
@@ -82,7 +83,7 @@ export default function LearnPage() {
           </div>
 
           <div style={{ marginTop: '50px', display: 'flex', gap: '24px' }}>
-            <button 
+            <button
               onClick={handleStudy}
               disabled={progress >= 100}
               style={{
@@ -94,7 +95,7 @@ export default function LearnPage() {
             >
               {progress >= 100 ? '研读大成' : '潜心钻研'}
             </button>
-            <button 
+            <button
               onClick={() => navigate('/puzzle/' + id)}
               style={{
                 padding: '16px 40px', fontSize: '1.2rem', background: 'transparent', color: '#F36838',
@@ -111,20 +112,20 @@ export default function LearnPage() {
 
         {/* 右侧图像区 */}
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ 
+          <div style={{
             width: '100%', height: '100%', maxHeight: '600px',
-            border: '1px solid #9B7B52', borderRadius: '16px', 
+            border: '1px solid #9B7B52', borderRadius: '16px',
             background: 'linear-gradient(135deg, rgba(76, 111, 177, 0.05), rgba(26, 21, 18, 0.05))',
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
             color: '#1A1512', fontSize: '1.5rem', boxShadow: 'inset 0 0 40px rgba(76, 111, 177, 0.1)'
           }}>
             <span style={{ fontFamily: '"Zhi Mang Xing", cursive', fontSize: '2.5rem', color: '#4C6FB1', marginBottom: '40px' }}>古建图鉴全览</span>
-            
+
             <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', padding: '0 40px', justifyContent: 'center' }}>
               {Array.from({ length: info.totalPieces }).map((_, i) => (
-                <div key={i} style={{ 
-                  width: '60px', height: '60px', 
-                  background: i < fragments.length ? '#16A951' : '#9D2933', 
+                <div key={i} style={{
+                  width: '60px', height: '60px',
+                  background: i < fragments.length ? '#16A951' : '#9D2933',
                   borderRadius: '8px', opacity: i < fragments.length ? 1 : 0.2,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   boxShadow: i < fragments.length ? '0 4px 12px rgba(22, 169, 81, 0.4)' : 'none',

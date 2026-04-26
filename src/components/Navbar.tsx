@@ -48,19 +48,6 @@ export default function Navbar() {
         >
           数字地图
         </Link>
-        <Link 
-          to="/puzzle" 
-          style={{
-            textDecoration: 'none',
-            color: location.pathname === '/puzzle' ? '#D23918' : '#2F251F',
-            fontWeight: location.pathname === '/puzzle' ? 'bold' : 'normal',
-            transition: 'color 0.3s ease',
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.color = '#D23918')}
-          onMouseLeave={(e) => (e.currentTarget.style.color = location.pathname === '/puzzle' ? '#D23918' : '#2F251F')}
-        >
-          结构拼图
-        </Link>
       </div>
     </nav>
   );

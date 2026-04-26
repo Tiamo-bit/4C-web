@@ -1,12 +1,25 @@
 import * as Phaser from 'phaser';
 import { useGestureStore } from '../../store/useGestureStore';
 
-// We import the static asset via Vite to get the resolved URL
+// Import all province puzzle images statically so Vite can resolve them
+const puzzleModules = import.meta.glob('../../assets/buildings/*/puzzle.png', { eager: true, import: 'default' }) as Record<string, string>;
+
+function getPuzzleUrl(provinceId: string): string {
+  // Keys look like "../../assets/buildings/beijing/puzzle.png"
+  const key = `../../assets/buildings/${provinceId}/puzzle.png`;
+  return puzzleModules[key] || '';
+}
+
+// Fallback to test-building if province puzzle not found
 import testBuildingUrl from '../../assets/buildings/test-building.png';
+
+const GRID = 3;        // 3×3 = 9 pieces
+const SCALE_FACTOR = 1; // 原始尺寸
 
 export class PuzzleScene extends Phaser.Scene {
   private draggedPiece: Phaser.GameObjects.Image | null = null;
   private puzzlePieces: Phaser.GameObjects.Image[] = [];
+  private fitScale = 1;
   private wasPinching = false;
   private worldX = 0;
   private worldY = 0;
@@ -19,63 +32,83 @@ export class PuzzleScene extends Phaser.Scene {
   }
 
   preload() {
-    this.load.image('test-building', testBuildingUrl);
+    const provinceId = this.registry.get('provinceId') || 'beijing';
+    const puzzleUrl = getPuzzleUrl(provinceId);
+    const imageUrl = puzzleUrl || testBuildingUrl;
+    this.load.image('puzzle-source', imageUrl);
   }
 
   create() {
     const { width: screenW, height: screenH } = this.scale;
 
-    // ── 1. Image Slicing Logic ────────────────────────────────────────
-    const texture = this.textures.get('test-building');
+    // ── 1. Image Slicing Logic (3×3) ────────────────────────────────
+    const texture = this.textures.get('puzzle-source');
     const sourceW = texture.source[0].width;
     const sourceH = texture.source[0].height;
 
-    const halfW = sourceW / 2;
-    const halfH = sourceH / 2;
+    // Use the smaller dimension for a square crop
+    const cropSize = Math.min(sourceW, sourceH);
+    const offsetX = Math.floor((sourceW - cropSize) / 2);
+    const offsetY = Math.floor((sourceH - cropSize) / 2);
 
-    // Create 4 frames on the base texture (2x2 grid)
-    // img.add(name, sourceIndex, x, y, width, height)
-    texture.add('piece0', 0, 0, 0, halfW, halfH);         // Top-Left
-    texture.add('piece1', 0, halfW, 0, halfW, halfH);     // Top-Right
-    texture.add('piece2', 0, 0, halfH, halfW, halfH);     // Bottom-Left
-    texture.add('piece3', 0, halfW, halfH, halfW, halfH); // Bottom-Right
+    const sliceW = Math.floor(cropSize / GRID);
+    const sliceH = Math.floor(cropSize / GRID);
 
-    // ── 2. Define Target Slots (Center of the screen) ─────────────────
+    // Create 9 frames on the base texture (3×3 grid)
+    for (let row = 0; row < GRID; row++) {
+      for (let col = 0; col < GRID; col++) {
+        const name = `piece${row * GRID + col}`;
+        texture.add(name, 0,
+          offsetX + col * sliceW, offsetY + row * sliceH,
+          sliceW, sliceH
+        );
+      }
+    }
+
+    // ── 2. Define Target Slots (Center, auto-fit to screen) ──────────
     const centerX = screenW / 2;
     const centerY = screenH / 2;
 
-    const targets = [
-      { id: 0, x: centerX - halfW / 2, y: centerY - halfH / 2 },
-      { id: 1, x: centerX + halfW / 2, y: centerY - halfH / 2 },
-      { id: 2, x: centerX - halfW / 2, y: centerY + halfH / 2 },
-      { id: 3, x: centerX + halfW / 2, y: centerY + halfH / 2 },
-    ];
+    // Auto-scale: assembled puzzle should fit ~60% of the smaller screen dimension
+    const maxPuzzlePx = Math.min(screenW, screenH - 80) * 0.6;
+    this.fitScale = maxPuzzlePx / (sliceW * GRID);
+    const displayW = sliceW * this.fitScale;
+    const displayH = sliceH * this.fitScale;
+
+    const targets: { id: number; x: number; y: number }[] = [];
+    for (let row = 0; row < GRID; row++) {
+      for (let col = 0; col < GRID; col++) {
+        targets.push({
+          id: row * GRID + col,
+          x: centerX + (col - 1) * displayW,
+          y: centerY + (row - 1) * displayH,
+        });
+      }
+    }
 
     // Draw target slots outlines
     targets.forEach(t => {
-      const slot = this.add.rectangle(t.x, t.y, halfW, halfH);
+      const slot = this.add.rectangle(t.x, t.y, displayW, displayH);
       slot.setStrokeStyle(2, 0x888888, 0.4);
       slot.setFillStyle(0xffffff, 0.05);
     });
 
     // ── 3. Create Draggable Pieces ────────────────────────────────────
-    // Scatter initial positions around the edges randomly or fixed
-    const scatterPositions = [
-      { x: screenW * 0.15, y: screenH * 0.3 }, // Left top
-      { x: screenW * 0.85, y: screenH * 0.7 }, // Right bottom
-      { x: screenW * 0.15, y: screenH * 0.7 }, // Left bottom
-      { x: screenW * 0.85, y: screenH * 0.3 }, // Right top
-    ];
+    // Scatter initial positions around the edges
+    const scatterPositions = targets.map((_, i) => ({
+      x: screenW * (0.1 + Math.random() * 0.2) + (i % 2 === 0 ? 0 : screenW * 0.55),
+      y: screenH * (0.15 + (i / (GRID * GRID)) * 0.7),
+    }));
 
     this.puzzlePieces = targets.map((t, index) => {
       const piece = this.add.image(
         scatterPositions[index].x,
         scatterPositions[index].y,
-        'test-building',
+        'puzzle-source',
         `piece${t.id}`
       );
 
-      // Setup piece state and interactions
+      piece.setScale(this.fitScale);
       piece.setInteractive({ useHandCursor: true });
       piece.setData('targetX', t.x);
       piece.setData('targetY', t.y);
@@ -83,16 +116,11 @@ export class PuzzleScene extends Phaser.Scene {
       piece.setData('isSnapping', false);
       piece.setDepth(5);
 
-      // Optional: Add a slight shadow or border to make it pop like a puzzle piece
-      // Phaser images don't have borders, but we can tint or use drop shadow plugins.
-
       return piece;
     });
 
     // ── 4. Subscribe to Zustand Global Gesture Store ──────────────────
-    // Transient update prevents React re-renders while giving us 60fps data
     this.unsubscribeStore = useGestureStore.subscribe((state, prevState) => {
-      // Only process if pinch state changed or coordinates moved
       if (
         state.x !== prevState.x ||
         state.y !== prevState.y ||
@@ -114,7 +142,7 @@ export class PuzzleScene extends Phaser.Scene {
     // Inner solid ring
     this.debugCursor.lineStyle(2, color, 1);
     this.debugCursor.strokeCircle(0, 0, radius);
-    
+
     // Outer halo ring (simulating soft gradient edge)
     this.debugCursor.lineStyle(6, color, 0.3);
     this.debugCursor.strokeCircle(0, 0, radius + 2);
@@ -124,7 +152,7 @@ export class PuzzleScene extends Phaser.Scene {
     if (this.cursorTween) this.cursorTween.stop();
     this.debugCursor.setScale(1);
     this.debugCursor.setAlpha(0.6);
-    
+
     this.cursorTween = this.tweens.add({
       targets: this.debugCursor,
       scaleX: 1.3,
@@ -152,6 +180,9 @@ export class PuzzleScene extends Phaser.Scene {
   /* ------------------------------------------------------------------ */
 
   private handleGestureUpdate(viewportX: number, viewportY: number, isPinching: boolean) {
+    // Guard: scene may not be fully ready or may be shutting down
+    if (!this.cameras || !this.cameras.main || !this.game || !this.game.canvas) return;
+
     // 1. Convert Viewport to World Coordinates
     const canvas = this.game.canvas;
     const canvasRect = canvas.getBoundingClientRect();
@@ -179,17 +210,17 @@ export class PuzzleScene extends Phaser.Scene {
           if (Phaser.Geom.Rectangle.Contains(bounds, this.worldX, this.worldY)) {
             this.draggedPiece = piece;
             piece.setDepth(10); // Bring to front
-            piece.setScale(1.1); // Visual lift
+            piece.setScale(this.fitScale * 1.1); // Visual lift
             piece.setAlpha(0.9);
             break;
           }
         }
       }
-      
+
       // Cursor transition: Pinched (shrink, high opacity, green)
       this.drawCursorRing(0x00ff00, 15);
       if (this.cursorTween) this.cursorTween.stop();
-      
+
       this.tweens.add({
         targets: this.debugCursor,
         scaleX: 0.8,
@@ -205,7 +236,7 @@ export class PuzzleScene extends Phaser.Scene {
       if (this.draggedPiece) {
         const piece = this.draggedPiece;
 
-        piece.setScale(1);
+        piece.setScale(this.fitScale);
         piece.setAlpha(1);
         piece.setDepth(5);
 
@@ -233,12 +264,13 @@ export class PuzzleScene extends Phaser.Scene {
               // Subtly flash to confirm successful placement
               this.tweens.add({
                 targets: piece,
-                scaleX: 1.05,
-                scaleY: 1.05,
+                scaleX: this.fitScale * 1.05,
+                scaleY: this.fitScale * 1.05,
                 yoyo: true,
                 duration: 150,
                 ease: 'Sine.easeInOut',
                 onComplete: () => {
+                  piece.setScale(this.fitScale);
                   this.checkCompletion();
                 }
               });
@@ -248,7 +280,7 @@ export class PuzzleScene extends Phaser.Scene {
 
         this.draggedPiece = null;
       }
-      
+
       // Cursor transition: Unpinched (restore large breathing red halo)
       this.drawCursorRing(0xff0000, 20);
       this.startBreathing();
@@ -261,9 +293,15 @@ export class PuzzleScene extends Phaser.Scene {
     const allLocked = this.puzzlePieces.every(p => p.getData('isLocked'));
     if (allLocked) {
       this.events.emit('PuzzleCompleted');
-      console.log('Puzzle Completed! All 4 pieces locked.');
+      console.log(`Puzzle Completed! All ${GRID * GRID} pieces locked.`);
 
-      // Optional: Add a celebratory full-image glow or particle effect
+      // Save completion to localStorage
+      const provinceId = this.registry.get('provinceId') || 'beijing';
+      const fragments = Array.from({ length: GRID * GRID }, (_, i) => i);
+      localStorage.setItem(`fragments_${provinceId}`, JSON.stringify(fragments));
+      localStorage.setItem(`learn_progress_${provinceId}`, '100');
+
+      // Celebratory glow
       this.puzzlePieces.forEach(p => {
         this.tweens.add({
           targets: p,

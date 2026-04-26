@@ -1,23 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { motion, useScroll, useTransform, AnimatePresence, useMotionValue } from 'framer-motion';
+import { motion, useScroll, useTransform, AnimatePresence, useMotionValue, useSpring } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
+import RevealParagraph from '../components/RevealParagraph';
 
 const ARCH_TERMS = ['京派四合院', '晋商大院', '陕北窑洞', '陇东地坑院', '苏式园林', '徽派粉墙黛瓦', '浙派台门院落', '闽南红砖古厝', '客家土楼', '川西吊脚楼', '傣家竹楼', '藏式碉房', '侗寨鼓楼', '蒙古包'];
 
-const PROVINCE_LIST = [
-  { id: 'beijing', name: '北京' },
-  { id: 'shanxi', name: '山西' },
-  { id: 'hebei', name: '河北' },
-  { id: 'shandong', name: '山东' },
-  { id: 'henan', name: '河南' },
-  { id: 'shaanxi', name: '陕西' },
-  { id: 'hubei', name: '湖北' },
-  { id: 'hunan', name: '湖南' },
-  { id: 'jiangxi', name: '江西' },
-  { id: 'zhejiang', name: '浙江' },
-  { id: 'jiangsu', name: '江苏' },
-  { id: 'anhui', name: '安徽' },
-];
+
 
 const ARCH_POSITIONS = ARCH_TERMS.map((term, i) => {
   const size = 3 + (i % 4) * 2;
@@ -112,7 +100,7 @@ const IntroPhase = ({ onEnterHub }: { onEnterHub: () => void }) => {
     sz: useTransform(scrollYProgress, steps, [0.4, 0.4, 0.4, 0.2, 0.2]),
   };
 
-  // b5: Z轴(进深) 左上 -> 解构后隐藏
+  // b5: Z轴(进深) 左上 -> 解构后消失（变为文字）
   const b5 = {
     x: useTransform(scrollYProgress, steps, [-20, -20, -300, 0, 0]),
     y: useTransform(scrollYProgress, steps, [-20, -20, -300, 0, 0]),
@@ -122,7 +110,7 @@ const IntroPhase = ({ onEnterHub }: { onEnterHub: () => void }) => {
     sz: useTransform(scrollYProgress, steps, [3.0, 3.0, 3.0, 0, 0]),
   };
 
-  // b6: Z轴(进深) 右下 -> 解构后隐藏
+  // b6: Z轴(进深) 右下 -> 解构后消失（变为文字）
   const b6 = {
     x: useTransform(scrollYProgress, steps, [20, 20, 300, 0, 0]),
     y: useTransform(scrollYProgress, steps, [20, 20, 300, 0, 0]),
@@ -132,14 +120,22 @@ const IntroPhase = ({ onEnterHub }: { onEnterHub: () => void }) => {
     sz: useTransform(scrollYProgress, steps, [3.0, 3.0, 3.0, 0, 0]),
   };
 
-  // 红底牌匾显现控制
-  const plaqueOpacity = useTransform(scrollYProgress, [0.85, 0.95], [0, 1]);
+  // 文字显现：木构件消失后，文字浮现
+  // 文字显现：用 React state 驱动，彻底绕开 framer-motion 的隐式 transform
+  const [textVisible, setTextVisible] = useState(false);
+  useEffect(() => {
+    const unsubscribe = scrollYProgress.on('change', (v) => {
+      setTextVisible(v > 0.72);
+    });
+    return unsubscribe;
+  }, [scrollYProgress]);
 
   return (
     <div ref={scrollContainerRef} style={{ width: '100vw', height: '100vh', overflowY: 'scroll', overflowX: 'hidden', position: 'relative', zIndex: 10 }}>
       <div style={{ height: '400vh', width: '100%' }}>
         <div style={{ position: 'sticky', top: 0, height: '100vh', width: '100%', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', perspective: '2000px' }}>
 
+          {/* 3D 场景 */}
           <motion.div style={{ position: 'relative', transformStyle: 'preserve-3d', rotateX: globalRotateX, rotateY: globalRotateY }}>
             <UnitCube transforms={b1} />
             <UnitCube transforms={b2} />
@@ -147,32 +143,43 @@ const IntroPhase = ({ onEnterHub }: { onEnterHub: () => void }) => {
             <UnitCube transforms={b4} />
             <UnitCube transforms={b5} />
             <UnitCube transforms={b6} />
-
-            {/* 【完美修复】：红底金字，竖排牌匾 */}
-            <motion.div
-              onClick={() => {
-                if (scrollYProgress.get() >= 0.9) onEnterHub();
-              }}
-              style={{
-                position: 'absolute', width: 160, height: 500, marginLeft: -80, marginTop: -250,
-                background: '#8A251E', // 纯正朱红
-                border: '4px solid #D4AF37', // 描金边框
-                writingMode: 'vertical-rl',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                boxShadow: '0 0 50px rgba(138, 37, 30, 0.8), inset 0 0 30px rgba(0,0,0,0.4)',
-                opacity: plaqueOpacity,
-                transform: 'translateZ(10px)', // 浮在木框之上
-                cursor: useTransform(scrollYProgress, [0.85, 0.9], ['default', 'pointer']) as any,
-              }}
-            >
-              <span style={{ fontFamily: '"Zhi Mang Xing", cursive', fontSize: '3.5rem', color: '#F4ECDF', textShadow: '0 0 15px #D4AF37, 2px 2px 5px rgba(0,0,0,0.8)', letterSpacing: '16px' }}>
-                中华传统古建筑
-              </span>
-            </motion.div>
           </motion.div>
 
+          {/* 
+            "中国古代建筑" 文字 —— 用纯 <div> 渲染，不使用 motion.div，
+            放在 sticky 容器内部、preserve-3d 外部，用 z-index 压在 3D 场景上方
+          */}
+          <div
+            onClick={() => {
+              if (scrollYProgress.get() >= 0.8) onEnterHub();
+            }}
+            style={{
+              position: 'absolute',
+              top: 0, left: 0, right: 0, bottom: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              writingMode: 'vertical-rl' as const,
+              zIndex: 100,
+              pointerEvents: textVisible ? 'auto' : 'none',
+              opacity: textVisible ? 1 : 0,
+              transition: 'opacity 0.6s ease',
+              cursor: 'pointer',
+            }}
+          >
+            <div style={{
+              color: '#1A1512',
+              fontSize: '54px',
+              fontFamily: '"KaiTi", "STKaiti", "SimSun", serif',
+              fontWeight: 900,
+              letterSpacing: '18px',
+              textShadow: '0 0 16px rgba(255,255,255,0.95), 0 0 40px rgba(255,255,255,0.7), 2px 2px 6px rgba(0,0,0,0.25)',
+              paddingTop: '18px',
+            }}>
+              中国古代建筑
+            </div>
+          </div>
+
           <motion.div style={{ position: 'absolute', bottom: '40px', opacity: useTransform(scrollYProgress, [0, 0.15], [1, 0]), color: '#1A1512', fontWeight: 'bold', fontSize: '1.2rem', letterSpacing: '4px' }}>
-            向下滚动 解构孔明密码 ↓
+            向下滚动 ↓
           </motion.div>
         </div>
       </div>
@@ -180,91 +187,301 @@ const IntroPhase = ({ onEnterHub }: { onEnterHub: () => void }) => {
   );
 };
 
-// ==========================================
-// 阶段二：四板块主页 (干净纯粹，无牌匾)
-// ==========================================
+
+// 阶段二：沉浸式全屏滚动 + 顶部全站导航
+
+
+/* 全量省份列表（含有无数据标志） */
+const ALL_PROVINCES = [
+  { id: 'beijing', name: '北京' }, { id: 'tianjin', name: '天津' }, { id: 'hebei', name: '河北' },
+  { id: 'shanxi', name: '山西' }, { id: 'neimenggu', name: '内蒙古' }, { id: 'liaoning', name: '辽宁' },
+  { id: 'jilin', name: '吉林' }, { id: 'heilongjiang', name: '黑龙江' }, { id: 'shanghai', name: '上海' },
+  { id: 'jiangsu', name: '江苏' }, { id: 'zhejiang', name: '浙江' }, { id: 'anhui', name: '安徽' },
+  { id: 'fujian', name: '福建' }, { id: 'jiangxi', name: '江西' }, { id: 'shandong', name: '山东' },
+  { id: 'henan', name: '河南' }, { id: 'hubei', name: '湖北' }, { id: 'hunan', name: '湖南' },
+  { id: 'guangdong', name: '广东' }, { id: 'guangxi', name: '广西' }, { id: 'hainan', name: '海南' },
+  { id: 'chongqing', name: '重庆' }, { id: 'sichuan', name: '四川' }, { id: 'guizhou', name: '贵州' },
+  { id: 'yunnan', name: '云南' }, { id: 'xizang', name: '西藏' }, { id: 'shaanxi', name: '陕西' },
+  { id: 'gansu', name: '甘肃' }, { id: 'qinghai', name: '青海' }, { id: 'ningxia', name: '宁夏' },
+  { id: 'xinjiang', name: '新疆' }, { id: 'taiwan', name: '台湾' },
+  { id: 'xianggang', name: '香港' }, { id: 'aomen', name: '澳门' },
+];
+
+/* 有数据的省份 ID 集合 */
+const HAS_DATA = new Set([
+  'beijing', 'tianjin', 'hebei', 'shanxi', 'neimenggu', 'liaoning', 'jilin', 'heilongjiang',
+  'shanghai', 'jiangsu', 'zhejiang', 'anhui', 'fujian', 'jiangxi', 'shandong', 'henan',
+  'hubei', 'hunan', 'guangdong', 'guangxi', 'hainan', 'chongqing', 'sichuan', 'guizhou',
+  'yunnan', 'xizang', 'shaanxi', 'gansu', 'qinghai', 'ningxia', 'xinjiang'
+]);
+
+/* 三屏宣传文案（可配置） */
+const HERO_SECTIONS = [
+  {
+    text: '榫卯之间，承载千年智慧\n从北国琉璃到南疆竹楼，每一根梁柱都是匠人与天地的对话',
+    bgImage: '', // 空 = 占位
+  },
+  {
+    text: '三十一处营造遗珍\n跨越山河，探寻散落在华夏大地上的建筑基因图谱',
+    bgImage: '',
+  },
+  {
+    text: '以古法拼合，复原千年造物\n从碎片到全貌，亲手重组中国古代建筑的营造密码',
+    bgImage: '',
+  },
+];
+
 const HubPhase = () => {
   const navigate = useNavigate();
-  const [isExploded, setIsExploded] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const { scrollYProgress } = useScroll({ container: scrollRef });
+
+  /* ─── 导航状态 ─── */
+  const [showMegaMenu, setShowMegaMenu] = useState(false);
+  const [showCollection, setShowCollection] = useState(false);
+  const [showLogin, setShowLogin] = useState(false);
+  const [toast, setToast] = useState('');
+  const megaMenuTimer = useRef<number | null>(null);
+
+  /* Mega Menu hover 延迟关闭 */
+  const openMegaMenu = () => {
+    if (megaMenuTimer.current) clearTimeout(megaMenuTimer.current);
+    setShowMegaMenu(true);
+  };
+  const closeMegaMenu = () => {
+    megaMenuTimer.current = window.setTimeout(() => setShowMegaMenu(false), 200);
+  };
+
+  /* 省份点击 */
+  const handleProvinceClick = (id: string) => {
+    if (HAS_DATA.has(id)) {
+      navigate(`/learn/${id}`);
+    } else {
+      setToast('该地区古建筑待发掘');
+      setTimeout(() => setToast(''), 2000);
+    }
+  };
+
+  /* ─── 碎片收集进度 ─── */
   const [collectedPieces, setCollectedPieces] = useState(0);
-  const totalPieces = 56;
+  const totalPieces = 279; // 31 provinces × 9 pieces
 
   useEffect(() => {
     let pieces = 0;
-    PROVINCE_LIST.forEach(p => {
+    ALL_PROVINCES.forEach(p => {
       const fragments = localStorage.getItem(`fragments_${p.id}`);
-      if (fragments) pieces += JSON.parse(fragments).length;
+      if (fragments) {
+        try { pieces += JSON.parse(fragments).length; } catch { }
+      }
     });
     setCollectedPieces(pieces);
-  }, []);
+  }, [showCollection]);
+
+  /* 各省完成状态 */
+  const getProvinceCompletion = (id: string) => {
+    const frag = localStorage.getItem(`fragments_${id}`);
+    if (!frag) return 0;
+    try { return JSON.parse(frag).length; } catch { return 0; }
+  };
+
+  /* ─── 视差弹簧 ─── */
+  const springY = useSpring(scrollYProgress, { stiffness: 100, damping: 30, mass: 0.5 });
 
   return (
-    <div style={{ position: 'fixed', top: 0, left: 0, zIndex: 10, display: 'flex', width: '100%', height: '100vh', padding: '24px', gap: '24px', boxSizing: 'border-box' }}>
-
-      {/* 左侧：省份百科全书 */}
-      <div className="no-scroll" style={{ width: '20%', height: '100%', border: '1px solid #9B7B52', borderRadius: '16px', background: 'linear-gradient(180deg, rgba(76, 111, 177, 0.05), rgba(76, 111, 177, 0.15))', backdropFilter: 'blur(10px)', overflowY: 'auto', padding: '24px 16px', boxSizing: 'border-box', boxShadow: 'inset 0 0 20px rgba(76, 111, 177, 0.1)' }}>
-        <h2 style={{ color: '#1A1512', fontSize: '1.8rem', marginBottom: '24px', borderBottom: '1px solid rgba(155, 123, 82, 0.5)', paddingBottom: '12px', textAlign: 'center', fontFamily: '"Zhi Mang Xing", cursive', letterSpacing: '4px' }}>典藏地域志</h2>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {PROVINCE_LIST.map(p => (
-            <motion.button
-              key={p.id} onClick={() => navigate(`/learn/${p.id}`)}
-              whileHover={{ scale: 1.02, backgroundColor: 'rgba(155, 123, 82, 0.2)', color: '#F36838', borderColor: '#F36838' }}
-              style={{ background: 'rgba(255, 255, 255, 0.6)', border: '1px solid rgba(155, 123, 82, 0.3)', padding: '16px 20px', borderRadius: '8px', cursor: 'pointer', color: '#1A1512', fontSize: '1.2rem', fontWeight: 'bold', transition: 'all 0.3s ease', textAlign: 'center', boxShadow: '0 4px 12px rgba(26, 21, 18, 0.05)' }}
+    <>
+      {/* ═══════ 固定导航栏 ═══════ */}
+      <nav className="hub-navbar">
+        <div className="hub-navbar__inner" style={{ flexDirection: 'column', gap: '4px', padding: '8px 40px' }}>
+          {/* 网站主标题 */}
+          <span style={{
+            fontFamily: '"Liu Jian Mao Cao", cursive',
+            fontSize: '57px',
+            color: '#1A1512',
+            letterSpacing: '0.15em',
+            lineHeight: 1,
+          }}>
+            筑迹中国
+          </span>
+          {/* 四个导航入口 */}
+          <div style={{ display: 'flex', justifyContent: 'space-around', width: '100%' }}>
+            <button
+              className="hub-nav-item"
+              onMouseEnter={openMegaMenu}
+              onMouseLeave={closeMegaMenu}
             >
-              {p.name}
-            </motion.button>
-          ))}
+              地域图志
+            </button>
+            <button className="hub-nav-item" onClick={() => navigate('/map')}>
+              神州沙盘
+            </button>
+            <button className="hub-nav-item" onClick={() => setShowCollection(true)}>
+              营造图鉴
+            </button>
+            <button className="hub-nav-item" onClick={() => setShowLogin(true)}>
+              营造入卷
+            </button>
+          </div>
         </div>
-      </div>
+      </nav>
 
-      {/* 右侧主视觉区 (去除了占位的牌匾) */}
-      <div style={{ width: '80%', height: '100%', display: 'flex', flexDirection: 'column', gap: '24px' }}>
-
-        {/* 数字神州沙盘 */}
-        <motion.div
-          whileHover={{ boxShadow: '0 12px 50px rgba(22, 169, 81, 0.3)', borderColor: '#16A951' }}
-          onClick={() => navigate('/map')}
-          style={{ flex: '1', background: 'rgba(255, 255, 255, 0.3)', backdropFilter: 'blur(16px)', border: '2px solid rgba(155, 123, 82, 0.5)', borderRadius: '16px', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', boxShadow: '0 8px 32px rgba(26, 21, 18, 0.1)', transition: 'all 0.4s ease' }}
-        >
-          <h2 style={{ fontSize: '3.5rem', color: '#1A1512', marginBottom: '20px', fontWeight: 'bold', fontFamily: '"Zhi Mang Xing", cursive', letterSpacing: '8px' }}>数字神州沙盘</h2>
-          <p style={{ color: '#4C6FB1', fontSize: '1.4rem', marginBottom: '32px' }}>化身灵宠，跃历华夏河山，探寻营造法则</p>
-          <div style={{ padding: '16px 48px', background: 'transparent', border: '2px solid #16A951', color: '#16A951', borderRadius: '30px', fontWeight: 'bold', fontSize: '1.25rem', boxShadow: '0 0 20px rgba(22, 169, 81, 0.2)' }}>进入地图空间</div>
-        </motion.div>
-
-        {/* 底部双卡片 */}
-        <div style={{ flex: '0 0 40%', display: 'flex', gap: '24px' }}>
-          {/* 匠心集萃 */}
-          <div style={{ flex: 1, background: 'rgba(255, 255, 255, 0.5)', border: '1px solid #9B7B52', borderRadius: '16px', padding: '24px', display: 'flex', flexDirection: 'column', backdropFilter: 'blur(8px)' }}>
-            <h3 style={{ color: '#1A1512', fontSize: '1.5rem', marginBottom: '16px', fontWeight: 'bold' }}>匠心集萃</h3>
-            <p style={{ color: '#4C6FB1', marginBottom: '20px', fontSize: '1.1rem' }}>已收集构件碎片: <span style={{ color: '#F36838', fontWeight: 'bold' }}>{collectedPieces}/{totalPieces}</span></p>
-            <div className="no-scroll" style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', overflowY: 'auto' }}>
-              {Array.from({ length: 18 }).map((_, i) => (
-                <div key={i} style={{ width: '50px', height: '50px', borderRadius: '8px', background: i < collectedPieces ? '#16A951' : '#9D2933', opacity: i < collectedPieces ? 1 : 0.2, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: i < collectedPieces ? '0 0 10px rgba(22, 169, 81, 0.4)' : 'inset 0 0 10px rgba(0,0,0,0.5)' }}>
-                  {i < collectedPieces && <span style={{ color: 'white', fontSize: '20px' }}>✦</span>}
-                </div>
+      {/* ═══════ Mega Menu 省份网格 ═══════ */}
+      <AnimatePresence>
+        {showMegaMenu && (
+          <motion.div
+            className="hub-mega-menu"
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.25 }}
+            onMouseEnter={openMegaMenu}
+            onMouseLeave={closeMegaMenu}
+          >
+            <div className="hub-mega-menu__grid">
+              {ALL_PROVINCES.map(p => (
+                <button
+                  key={p.id}
+                  className={`hub-mega-menu__tag ${HAS_DATA.has(p.id) ? '' : 'is-locked'}`}
+                  onClick={() => handleProvinceClick(p.id)}
+                >
+                  {p.name}
+                </button>
               ))}
             </div>
-          </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-          {/* 天工开物 */}
-          <div
-            onMouseEnter={() => setIsExploded(true)} onMouseLeave={() => setIsExploded(false)}
-            style={{ flex: 1, background: 'linear-gradient(135deg, rgba(76, 111, 177, 0.1), rgba(26, 21, 18, 0.05))', border: '1px solid #9B7B52', borderRadius: '16px', padding: '24px', position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', perspective: '800px', backdropFilter: 'blur(8px)' }}
+      {/* Toast 提示 */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            className="hub-mega-menu__toast"
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
           >
-            <h3 style={{ position: 'absolute', top: '24px', left: '24px', color: '#1A1512', fontSize: '1.5rem', fontWeight: 'bold' }}>天工开物</h3>
-            <p style={{ position: 'absolute', top: '60px', left: '24px', color: '#4C6FB1', fontSize: '1.1rem' }}>悬停观测构件解剖</p>
-            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'radial-gradient(circle, rgba(76, 111, 177, 0.2) 0%, transparent 70%)', pointerEvents: 'none' }} />
+            {toast}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-            <motion.div animate={{ rotateY: 360 }} transition={{ duration: 20, repeat: Infinity, ease: 'linear' }} style={{ transformStyle: 'preserve-3d', position: 'relative', width: '100px', height: '100px', marginTop: '20px' }}>
-              <motion.div animate={{ y: isExploded ? 50 : 0 }} transition={{ type: 'spring', stiffness: 200, damping: 15 }} style={{ width: '30px', height: '100px', background: '#9B7B52', position: 'absolute', left: '35px', top: '0', border: '1px solid #1A1512', boxShadow: 'inset 0 0 10px rgba(0,0,0,0.5)' }} />
-              <motion.div animate={{ x: isExploded ? -60 : 0, z: isExploded ? 40 : 0 }} transition={{ type: 'spring', stiffness: 200, damping: 15 }} style={{ width: '140px', height: '20px', background: '#F36838', position: 'absolute', left: '-20px', top: '20px', transform: 'translateZ(15px)', border: '1px solid #1A1512' }} />
-              <motion.div animate={{ x: isExploded ? 60 : 0, z: isExploded ? -40 : 0 }} transition={{ type: 'spring', stiffness: 200, damping: 15 }} style={{ width: '140px', height: '20px', background: '#F36838', position: 'absolute', left: '-20px', top: '20px', transform: 'rotateY(90deg) translateZ(15px)', border: '1px solid #1A1512' }} />
-              <motion.div animate={{ y: isExploded ? -60 : 0 }} transition={{ type: 'spring', stiffness: 200, damping: 15 }} style={{ width: '50px', height: '25px', background: '#4C6FB1', position: 'absolute', left: '25px', top: '-25px', transform: 'translateZ(0px)', border: '1px solid #1A1512' }} />
-            </motion.div>
-          </div>
-        </div>
+      {/* ═══════ 全屏 Scroll-Snap 区域 ═══════ */}
+      <div ref={scrollRef} className="hub-scroll-container">
+        {HERO_SECTIONS.map((section, i) => (
+          <section key={i} className="hub-section">
+            {/* 背景层（有图用图，无图占位） */}
+            {section.bgImage ? (
+              <motion.div
+                className="hub-section__bg"
+                style={{
+                  backgroundImage: `url(${section.bgImage})`,
+                  y: useTransform(springY, [i / 3, (i + 1) / 3], ['0%', '-10%']),
+                }}
+              />
+            ) : (
+              <div className="hub-section__bg hub-section__bg--placeholder">
+                <span className="hub-section__placeholder-text">实景素材待载入</span>
+              </div>
+            )}
+
+            {/* 遮罩层 */}
+            <div className="hub-section__overlay" />
+
+            {/* 文案层 */}
+            <div className="hub-section__content">
+              <RevealParagraph text={section.text} />
+            </div>
+          </section>
+        ))}
       </div>
-    </div>
+
+      {/* ═══════ 营造图鉴 Overlay ═══════ */}
+      <AnimatePresence>
+        {showCollection && (
+          <motion.div
+            className="hub-collection-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setShowCollection(false)}
+          >
+            <motion.div
+              className="hub-collection-panel"
+              initial={{ opacity: 0, scale: 0.92, y: 30 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 30 }}
+              transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+              onClick={e => e.stopPropagation()}
+              style={{ position: 'relative' }}
+            >
+              <button className="close-btn" onClick={() => setShowCollection(false)}>✕</button>
+              <h2>营造图鉴</h2>
+              <p style={{ color: '#6a5845', marginBottom: '4px' }}>
+                碎片收集进度：<span style={{ color: '#16A951', fontWeight: 700 }}>{collectedPieces}</span> / {totalPieces}
+              </p>
+              <div className="hub-progress-bar">
+                <div className="hub-progress-fill" style={{ width: `${(collectedPieces / totalPieces) * 100}%` }} />
+              </div>
+
+              <div className="hub-buildings-grid">
+                {ALL_PROVINCES.filter(p => HAS_DATA.has(p.id)).map(p => {
+                  const completed = getProvinceCompletion(p.id);
+                  const isComplete = completed >= 9;
+                  return (
+                    <div key={p.id} className={`hub-building-card ${isComplete ? 'is-complete' : 'is-locked'}`}>
+                      <span style={{ fontSize: '2rem', marginBottom: '6px' }}>{isComplete ? '🏛️' : '🔒'}</span>
+                      <span style={{ fontWeight: 600, color: isComplete ? '#16A951' : '#6a5845' }}>{p.name}</span>
+                      <span style={{ fontSize: '11px', opacity: 0.7 }}>{completed}/9</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ═══════ 登录弹窗 ═══════ */}
+      <AnimatePresence>
+        {showLogin && (
+          <motion.div
+            className="hub-login-backdrop"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setShowLogin(false)}
+          >
+            <motion.div
+              className="hub-login-card"
+              initial={{ opacity: 0, scale: 0.9, y: 30 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 30 }}
+              transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+              onClick={e => e.stopPropagation()}
+            >
+              <button className="close-btn" onClick={() => setShowLogin(false)} style={{
+                position: 'absolute', top: 16, right: 16, width: 36, height: 36,
+                borderRadius: '50%', border: '1px solid rgba(112,84,47,0.2)',
+                background: 'rgba(255,255,255,0.6)', fontSize: 18, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: '#38291d', fontFamily: 'inherit'
+              }}>✕</button>
+              <h2>营造入卷</h2>
+              <p>登录以保存你的探索进度与成就</p>
+              <label>
+                用户名
+                <input type="text" placeholder="请输入用户名" />
+              </label>
+              <label>
+                密码
+                <input type="password" placeholder="请输入密码" />
+              </label>
+              <button className="submit-btn">入卷登录</button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
   );
 };
 

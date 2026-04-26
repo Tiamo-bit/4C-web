@@ -1,8 +1,9 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import PhaserGame from '../components/PhaserGame';
 
 export default function PuzzlePage() {
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   return (
     <div style={{ width: '100vw', height: '100vh', position: 'relative', overflow: 'hidden', paddingTop: '64px', boxSizing: 'border-box', background: '#1A1512' }}>
@@ -26,7 +27,7 @@ export default function PuzzlePage() {
       >
         ← 退出拼图
       </button>
-      <PhaserGame />
+      <PhaserGame provinceId={id || 'beijing'} />
     </div>
   );
 }

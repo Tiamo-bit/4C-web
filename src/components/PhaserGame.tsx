@@ -3,7 +3,7 @@ import * as Phaser from 'phaser';
 import { PuzzleScene } from '../features/puzzle/PuzzleScene';
 import { useHandTrackingEngine } from '../features/gesture/useHandTrackingEngine';
 
-export default function PhaserGame() {
+export default function PhaserGame({ provinceId }: { provinceId: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const gameRef = useRef<Phaser.Game | null>(null);
 
@@ -65,6 +65,9 @@ export default function PhaserGame() {
     };
 
     gameRef.current = new Phaser.Game(config);
+
+    // Pass provinceId to the scene via registry
+    gameRef.current.registry.set('provinceId', provinceId);
 
     return () => {
       if (gameRef.current) {
