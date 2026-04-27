@@ -1,3 +1,4 @@
+// AI辅助生成： [你的AI模型] , 2026-04-11
 import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import PhaserGame from '../components/PhaserGame';

@@ -489,6 +489,7 @@ export const PetOnMap = forwardRef<PetOnMapHandle, PetOnMapProps>(function PetOn
     if (!current) return;
 
     let stopped = false;
+    // AI辅助优化： [你的AI模型] , 2026-04-24
     const bootCamera = async () => {
       if (!enableCamera || !videoRef.current) {
         setCameraStatus("fallback");

@@ -1,3 +1,4 @@
+// AI辅助生成： [你的AI模型] , 2026-04-02
 import React, { useRef } from 'react';
 import { motion, useInView } from 'framer-motion';
 

@@ -28,6 +28,7 @@ export function useHandTrackingEngine(videoElement: HTMLVideoElement | null) {
 
     let cancelled = false;
 
+    // AI辅助优化： [你的AI模型] , 2026-04-14
     async function initEngine() {
       try {
         setStatus('loading');
@@ -59,6 +60,7 @@ export function useHandTrackingEngine(videoElement: HTMLVideoElement | null) {
         setStatus('ready');
 
         // Engine Detection Loop
+        // AI辅助优化： [你的AI模型] , 2026-04-14
         function detect() {
           if (cancelled || !videoElement) return;
 

@@ -1,10 +1,11 @@
 import React, { useRef } from 'react';
 import { motion, useInView, Variants } from 'framer-motion';
 
-export default function RevealParagraph({ text }: { text: string }) {
+export default function RevealParagraph({ text, fontSize = '1.7rem' }: { text: string, fontSize?: string }) {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: "-10% 0px" });
 
+  // AI辅助优化： [Kimi K2.6] , 2026-04-21
   // 明确指定类型为 Variants
   const container: Variants = {
     hidden: { opacity: 0 },
@@ -39,7 +40,7 @@ export default function RevealParagraph({ text }: { text: string }) {
       animate={isInView ? "visible" : "hidden"}
       style={{
         lineHeight: 2,
-        fontSize: '1.7rem',
+        fontSize,
         color: 'rgba(255, 247, 230, 0.92)',
         margin: 0,
         display: 'flex',

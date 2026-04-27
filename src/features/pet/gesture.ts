@@ -114,6 +114,7 @@ type MediaPipeDirectionOptions = {
   lockTimeMs?: number;
 };
 
+// AI辅助优化： [你的AI模型] , 2026-04-17
 export async function startMediaPipeDirectionRecognizer({
   enabled = true,
   onDirection,

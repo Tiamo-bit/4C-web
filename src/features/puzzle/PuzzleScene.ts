@@ -41,6 +41,7 @@ export class PuzzleScene extends Phaser.Scene {
   create() {
     const { width: screenW, height: screenH } = this.scale;
 
+    // AI辅助生成： [你的AI模型] , 2026-03-25
     // ── 1. Image Slicing Logic (3×3) ────────────────────────────────
     const texture = this.textures.get('puzzle-source');
     const sourceW = texture.source[0].width;
@@ -179,6 +180,7 @@ export class PuzzleScene extends Phaser.Scene {
   /*  Physics & Dragging Logic                                           */
   /* ------------------------------------------------------------------ */
 
+  // AI辅助优化： [你的AI模型] , 2026-04-20
   private handleGestureUpdate(viewportX: number, viewportY: number, isPinching: boolean) {
     // Guard: scene may not be fully ready or may be shutting down
     if (!this.cameras || !this.cameras.main || !this.game || !this.game.canvas) return;

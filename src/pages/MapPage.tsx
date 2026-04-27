@@ -89,6 +89,7 @@ function PetAvatar({ skin, left, top, moving, onClick }: any) {
         // 确保中心点对齐
         transform: 'translate(-50%, -100%)'
       } as CSSProperties}
+      initial={false}
       animate={{ 
         left: `${left}%`, 
         top: `${top}%` 
@@ -184,23 +185,23 @@ export default function MapPage() {
   };
 
   return (
-    <div style={{ width: '100vw', height: '100vh', paddingTop: '64px', boxSizing: 'border-box', background: '#F4ECDF' }}>
-      <section className="map-page">
-        <div className="map-main">
-          <header className="map-header">
+    <div style={{ width: '100vw', height: '100vh', paddingTop: '64px', boxSizing: 'border-box', background: '#F4ECDF', overflow: 'hidden', position: 'relative' }}>
+      <section className="map-page" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+        <div className="map-main" style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+          <header className="map-header" style={{ flexShrink: 0 }}>
             <div className="map-hint">当前聚焦：{selectedProvince?.name ?? '未选择'}</div>
           </header>
 
-          <div className="map-shell" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="map-shell" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 0, paddingBottom: '40px' }}>
             {/* 紧紧包裹图片的 wrapper，杜绝外部坐标系漂移 */}
             <div 
-              style={{ position: 'relative', display: 'inline-block', maxWidth: '100%', maxHeight: '100%' }}
+              style={{ position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center', maxWidth: '100%', maxHeight: 'calc(100% - 60px)' }}
             >
               
               <img 
                 src={chinaMapUrl} 
                 alt="中国地图" 
-                style={{ display: 'block', maxWidth: '100%', maxHeight: '100%', width: 'auto', height: 'auto' }} 
+                style={{ display: 'block', maxWidth: '100%', maxHeight: '100%', width: 'auto', height: 'auto', objectFit: 'contain' }} 
               />
               
               <div className="map-hotspots" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
@@ -266,6 +267,20 @@ export default function MapPage() {
           </div>
         </div>
       </section>
+      
+      {/* 底部版权说明 */}
+      <div style={{ 
+        position: 'absolute', 
+        bottom: '8px', 
+        right: '16px', 
+        fontSize: '16.8px', 
+        color: '#8A7B66',
+        zIndex: 50
+      }}>
+        底图来源：<a href="http://bzdt.ch.mnr.gov.cn/" target="_blank" rel="noopener noreferrer" style={{ color: '#8A7B66', textDecoration: 'underline' }}>标准地图服务（http://bzdt.ch.mnr.gov.cn/）网站</a>
+      </div>
+
     </div>
+
   );
 }

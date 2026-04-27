@@ -10,6 +10,7 @@ export default function PhaserGame({ provinceId }: { provinceId: string }) {
   // 使用 useState 存储 video 实例，触发 AI 引擎的生命周期
   const [videoElement, setVideoElement] = useState<HTMLVideoElement | null>(null);
 
+  // AI辅助优化： [你的AI模型] , 2026-04-22
   // 1. 唤起物理摄像头
   useEffect(() => {
     if (!videoElement) return;

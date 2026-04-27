@@ -1,3 +1,4 @@
+// AI辅助生成： [Kimi K2.5] , 2026-03-30
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 
@@ -9,7 +10,7 @@ export default function Navbar() {
   }
 
   return (
-    <nav 
+    <nav
       style={{
         position: 'fixed',
         top: 0,
@@ -29,13 +30,13 @@ export default function Navbar() {
       }}
     >
       <div style={{ fontWeight: 'bold', color: '#2F251F', fontSize: '1.25rem', letterSpacing: '1px' }}>
-        <Link to="/" style={{ textDecoration: 'none', color: 'inherit' }}>
+        <Link to="/?skipIntro=true" style={{ textDecoration: 'none', color: 'inherit' }}>
           4C 古建数字化平台
         </Link>
       </div>
       <div style={{ display: 'flex', gap: '32px' }}>
-        <Link 
-          to="/map" 
+        <Link
+          to="/map"
           style={{
             textDecoration: 'none',
             color: location.pathname === '/map' ? '#D23918' : '#2F251F',
