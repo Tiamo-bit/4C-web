@@ -193,16 +193,23 @@ export default function MapPage() {
           </header>
 
           <div className="map-shell" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 0, paddingBottom: '40px' }}>
-            {/* 紧紧包裹图片的 wrapper，杜绝外部坐标系漂移 */}
+            {/* 紧紧包裹图片的 wrapper，确保坐标系与图片物理边界一致 */}
             <div 
-              style={{ position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center', maxWidth: '100%', maxHeight: 'calc(100% - 60px)' }}
+              style={{ position: 'relative', display: 'inline-block', maxWidth: '100%' }}
             >
               
               <img 
                 src={chinaMapUrl} 
                 alt="中国地图" 
-                style={{ display: 'block', maxWidth: '100%', maxHeight: '100%', width: 'auto', height: 'auto', objectFit: 'contain' }} 
+                style={{ 
+                  display: 'block', 
+                  maxWidth: '100%', 
+                  maxHeight: 'calc(100vh - 180px)', // 严格约束高度，留出按钮空间
+                  width: 'auto', 
+                  height: 'auto' 
+                }} 
               />
+
               
               <div className="map-hotspots" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
                 {PROVINCES.map((p) => (
@@ -228,14 +235,16 @@ export default function MapPage() {
               
               <PetAvatar skin={currentSkin} left={petPosition.left} top={petPosition.top} moving={petMoving} onClick={() => setPetSkinIndex(i => i + 1)} />
 
-              {/* 点击进入按钮：紧贴地图下方 */}
+              {/* 点击进入按钮：压在地图边缘线上 */}
               <div style={{ 
                 position: 'absolute', 
-                bottom: '-20px', // 负值让其紧贴边缘下方
+                bottom: '0px', // 置于底部边缘
                 left: '50%', 
-                transform: 'translateX(-50%) translateY(100%)',
+                transform: 'translateX(-50%) translateY(50%)', // 向下偏移半个自身高度，使其压线显示
                 zIndex: 20 
               }}>
+
+
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
