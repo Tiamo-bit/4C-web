@@ -1,10 +1,11 @@
 // AI辅助生成： [DeepSeek-V4-Pro] , 2026-04-26
-import React, { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useEffect, useRef } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { motion, useInView } from 'framer-motion';
 import { PROVINCE_CONTENT } from '../data/provinces';
 import RevealText from '../components/RevealText';
 import RevealParagraph from '../components/RevealParagraph';
+import ArchitectureAssistant from '../components/ArchitectureAssistant';
 
 /* 兜底数据 */
 const DEFAULT_CONTENT = {
@@ -18,7 +19,6 @@ const DEFAULT_CONTENT = {
     { title: '历史高光', body: '历经千年风雨，依然屹立不倒的文化传奇。' },
   ],
   highlights: ['古建筑'],
-  totalPieces: 9,
 };
 
 /* 动态获取省份实景图*/
@@ -68,17 +68,29 @@ function NarrativeSection({ section, index }: { section: { title: string; body: 
 export default function LearnPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const content = PROVINCE_CONTENT[id || ''] || DEFAULT_CONTENT;
   const photoUrl = getPhotoUrl(id || '');
 
-  const [progress, setProgress] = useState(0);
-  const [fragments, setFragments] = useState<number[]>([]);
-  const [bgLoaded, setBgLoaded] = useState(false);
+  const [bgLoaded, setBgLoaded] = React.useState(false);
+  const heroRef = useRef(null);
+  const heroInView = useInView(heroRef, { once: true });
+  const cardRef = useRef(null);
+  const cardInView = useInView(cardRef, { once: true, margin: '-10% 0px' });
+  const footerRef = useRef<HTMLElement | null>(null);
+  const footerInView = useInView(footerRef, { once: true, margin: '-5% 0px' });
 
-  /* 滚动到顶部 */
+  /* 默认进入页面回到顶部；从拼图退出时回到底部入口 */
   useEffect(() => {
-    window.scrollTo(0, 0);
-  }, [id]);
+    if (location.hash === '#puzzle-entry') {
+      window.setTimeout(() => {
+        footerRef.current?.scrollIntoView({ block: 'end', behavior: 'auto' });
+      }, 0);
+      return;
+    }
+
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  }, [id, location.hash]);
 
   /* 预加载背景图 */
   useEffect(() => {
@@ -87,36 +99,6 @@ export default function LearnPage() {
     img.src = photoUrl;
     img.onload = () => setBgLoaded(true);
   }, [photoUrl]);
-
-  /* 恢复进度 */
-  useEffect(() => {
-    const savedProgress = localStorage.getItem(`learn_progress_${id}`);
-    const savedFragments = localStorage.getItem(`fragments_${id}`);
-    if (savedProgress) setProgress(Number(savedProgress));
-    if (savedFragments) setFragments(JSON.parse(savedFragments));
-  }, [id]);
-
-  const handleStudy = () => {
-    if (progress >= 100) return;
-    const step = 100 / content.totalPieces;
-    const newProgress = Math.min(100, progress + step);
-    setProgress(newProgress);
-    localStorage.setItem(`learn_progress_${id}`, newProgress.toString());
-    if (Math.floor(newProgress / step) > fragments.length) {
-      const newFragmentId = Math.floor(Math.random() * 1000);
-      const updatedFragments = [...fragments, newFragmentId];
-      setFragments(updatedFragments);
-      localStorage.setItem(`fragments_${id}`, JSON.stringify(updatedFragments));
-      alert(`恭喜！你深入研读了${content.arch}的历史，成功获得一块建筑核心碎片！`);
-    }
-  };
-
-  const heroRef = useRef(null);
-  const heroInView = useInView(heroRef, { once: true });
-  const cardRef = useRef(null);
-  const cardInView = useInView(cardRef, { once: true, margin: '-10% 0px' });
-  const footerRef = useRef(null);
-  const footerInView = useInView(footerRef, { once: true, margin: '-5% 0px' });
 
   return (
     <div className="learn-page">
@@ -200,55 +182,25 @@ export default function LearnPage() {
       {/* 底部操作区*/}
       <motion.footer
         ref={footerRef}
+        id="puzzle-entry"
         className="learn-footer"
         initial={{ opacity: 0, y: 40 }}
         animate={footerInView ? { opacity: 1, y: 0 } : {}}
         transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
       >
-        <div className="learn-footer__progress">
-          <div className="learn-footer__progress-header">
-            <span className="learn-footer__progress-label">结构研读进度</span>
-            <span className="learn-footer__progress-value">{Math.round(progress)}%</span>
-          </div>
-          <div className="learn-footer__progress-track">
-            <motion.div
-              className="learn-footer__progress-fill"
-              initial={{ width: 0 }}
-              animate={{ width: `${progress}%` }}
-              transition={{ duration: 0.6, ease: [0.25, 0.8, 0.25, 1] }}
-            />
-          </div>
-        </div>
-        <div className="learn-footer__fragments">
-          {Array.from({ length: content.totalPieces }).map((_, i) => (
-            <motion.div
-              key={i}
-              className={`learn-footer__fragment ${i < fragments.length ? 'is-collected' : ''}`}
-              initial={{ scale: 0 }}
-              animate={footerInView ? { scale: 1 } : {}}
-              transition={{ duration: 0.4, delay: 0.1 * i, ease: [0.16, 1, 0.3, 1] }}
-            >
-              <span>{i < fragments.length ? '✦' : '◇'}</span>
-            </motion.div>
-          ))}
+        <div className="learn-footer__intro">
+          <span className="learn-footer__eyebrow">榫卯拼图</span>
+          <h2>读至此处，动手复原这座建筑</h2>
+          <p>进入手势拼图，用拼合结构的方式回看前文中的营造智慧。</p>
         </div>
         <div className="learn-footer__actions">
           <motion.button
-            className={`learn-btn learn-btn--primary ${progress >= 100 ? 'is-complete' : ''}`}
-            whileHover={{ scale: progress >= 100 ? 1 : 1.04 }}
-            whileTap={{ scale: progress >= 100 ? 1 : 0.96 }}
-            onClick={handleStudy}
-            disabled={progress >= 100}
-          >
-            {progress >= 100 ? '✓ 研读大成' : '潜心钻研'}
-          </motion.button>
-          <motion.button
-            className="learn-btn learn-btn--secondary"
+            className="learn-btn learn-btn--primary"
             whileHover={{ scale: 1.04 }}
             whileTap={{ scale: 0.96 }}
             onClick={() => navigate('/puzzle/' + id)}
           >
-            开启榫卯拼图 ({fragments.length}/{content.totalPieces})
+            开启榫卯拼图
           </motion.button>
           <motion.button
             className="learn-btn learn-btn--ghost"
@@ -260,6 +212,13 @@ export default function LearnPage() {
           </motion.button>
         </div>
       </motion.footer>
+
+      <ArchitectureAssistant
+        provinceName={content.name}
+        archName={content.arch}
+        card={content.card}
+        sections={content.sections}
+      />
     </div>
   );
 }

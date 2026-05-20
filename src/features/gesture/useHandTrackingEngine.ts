@@ -4,6 +4,14 @@ import type { NormalizedLandmark } from '@mediapipe/tasks-vision';
 import { useGestureStore } from '../../store/useGestureStore';
 
 const UI_THROTTLE_MS = 100;
+const SMOOTHING_ALPHA = 0.42;
+const MAX_JUMP_PX_PER_FRAME = 90;
+const LOST_HAND_GRACE_MS = 200;
+const PINCH_START_THRESHOLD = 0.075;
+const PINCH_END_THRESHOLD = 0.11;
+const PINCH_STABLE_FRAMES = 2;
+
+type Point = { x: number; y: number };
 
 export function useHandTrackingEngine(videoElement: HTMLVideoElement | null) {
   const setTrackingData = useGestureStore((state) => state.setTrackingData);
@@ -13,6 +21,11 @@ export function useHandTrackingEngine(videoElement: HTMLVideoElement | null) {
   const rafIdRef = useRef<number>(0);
   const lastTimestampRef = useRef<number>(-1);
   const lastUiUpdateRef = useRef<number>(0);
+  const smoothedPointRef = useRef<Point | null>(null);
+  const lastValidPointRef = useRef<Point | null>(null);
+  const lostHandSinceRef = useRef<number | null>(null);
+  const pinchStateRef = useRef(false);
+  const pinchStableFramesRef = useRef(0);
 
   const distance = useCallback(
     (a: NormalizedLandmark, b: NormalizedLandmark) => {
@@ -21,6 +34,68 @@ export function useHandTrackingEngine(videoElement: HTMLVideoElement | null) {
       return Math.sqrt(dx * dx + dy * dy);
     },
     []
+  );
+
+  const clampJump = useCallback((next: Point, prev: Point | null) => {
+    if (!prev) return next;
+
+    const dx = next.x - prev.x;
+    const dy = next.y - prev.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+
+    if (dist <= MAX_JUMP_PX_PER_FRAME || dist === 0) return next;
+
+    const ratio = MAX_JUMP_PX_PER_FRAME / dist;
+    return {
+      x: prev.x + dx * ratio,
+      y: prev.y + dy * ratio,
+    };
+  }, []);
+
+  const smoothPoint = useCallback((raw: Point) => {
+    const prev = smoothedPointRef.current;
+    const clamped = clampJump(raw, prev);
+
+    if (!prev) {
+      smoothedPointRef.current = clamped;
+      return clamped;
+    }
+
+    // EMA keeps normal hand tremor from becoming cursor jitter while still
+    // allowing fast movement through the jump clamp above.
+    const smoothed = {
+      x: prev.x + (clamped.x - prev.x) * SMOOTHING_ALPHA,
+      y: prev.y + (clamped.y - prev.y) * SMOOTHING_ALPHA,
+    };
+
+    smoothedPointRef.current = smoothed;
+    return smoothed;
+  }, [clampJump]);
+
+  const updatePinchState = useCallback(
+    (hand: NormalizedLandmark[]) => {
+      const d = distance(hand[4], hand[8]);
+      const wasPinching = pinchStateRef.current;
+      const crossedThreshold = wasPinching
+        ? d > PINCH_END_THRESHOLD
+        : d < PINCH_START_THRESHOLD;
+
+      if (crossedThreshold) {
+        pinchStableFramesRef.current += 1;
+      } else {
+        pinchStableFramesRef.current = 0;
+      }
+
+      // Separate start/end thresholds plus stable frames avoid repeated
+      // grab/release when the fingertips hover around a single cutoff.
+      if (pinchStableFramesRef.current >= PINCH_STABLE_FRAMES) {
+        pinchStateRef.current = !wasPinching;
+        pinchStableFramesRef.current = 0;
+      }
+
+      return pinchStateRef.current;
+    },
+    [distance]
   );
 
   useEffect(() => {
@@ -77,41 +152,46 @@ export function useHandTrackingEngine(videoElement: HTMLVideoElement | null) {
 
 
               const hands = result.landmarks;
+              const activeHand = hands.find((hand) => hand.length >= 21);
 
-
-              // Pinch detection
-              let pinching = false;
-              for (const hand of hands) {
-                if (hand.length >= 21) {
-                  const d = distance(hand[4], hand[8]);
-                  if (d < 0.1) {
-                    pinching = true;
-                    break;
-                  }
-                }
-              }
-
-              // Extract index finger and map coordinates
+              // Extract index finger and map coordinates. Pinch is evaluated
+              // on the same hand to avoid two-hand coordinate/gesture mismatch.
               let normCoords: { x: number; y: number } | null = null;
-              let physicsX = 0;
-              let physicsY = 0;
+              let physicsPoint: Point | null = null;
+              let pinching = false;
 
-              if (hands.length > 0 && hands[0].length >= 21) {
-                const lm = hands[0][8];
-                // Mirror correction for front camera
-                normCoords = { x: 1 - lm.x, y: lm.y };
-                physicsX = normCoords.x * window.innerWidth;
-                physicsY = normCoords.y * window.innerHeight;
+              if (activeHand) {
+                lostHandSinceRef.current = null;
+                const lm = activeHand[8];
+                const rawNormCoords = { x: 1 - lm.x, y: lm.y };
+                const rawPhysicsPoint = {
+                  x: rawNormCoords.x * window.innerWidth,
+                  y: rawNormCoords.y * window.innerHeight,
+                };
+
+                physicsPoint = smoothPoint(rawPhysicsPoint);
+                lastValidPointRef.current = physicsPoint;
+                normCoords = {
+                  x: physicsPoint.x / window.innerWidth,
+                  y: physicsPoint.y / window.innerHeight,
+                };
+                pinching = updatePinchState(activeHand);
+              } else {
+                if (lostHandSinceRef.current === null) {
+                  lostHandSinceRef.current = now;
+                }
+                pinchStateRef.current = false;
+                pinchStableFramesRef.current = 0;
               }
 
               // Update Zustand Store
               const timeSinceLastUi = now - lastUiUpdateRef.current;
 
-              if (normCoords) {
+              if (normCoords && physicsPoint) {
                 if (timeSinceLastUi >= UI_THROTTLE_MS) {
                   lastUiUpdateRef.current = now;
                   setTrackingData(
-                    { x: physicsX, y: physicsY, isPinching: pinching },
+                    { x: physicsPoint.x, y: physicsPoint.y, isPinching: pinching, isTracked: true },
                     {
                       display: {
                         coords: normCoords,
@@ -122,21 +202,46 @@ export function useHandTrackingEngine(videoElement: HTMLVideoElement | null) {
                   );
                 } else {
                   // High frequency update only
-                  setTrackingData({ x: physicsX, y: physicsY, isPinching: pinching });
+                  setTrackingData({
+                    x: physicsPoint.x,
+                    y: physicsPoint.y,
+                    isPinching: pinching,
+                    isTracked: true,
+                  });
                 }
-              } else if (timeSinceLastUi >= UI_THROTTLE_MS) {
-                // Lost hand update
-                lastUiUpdateRef.current = now;
-                setTrackingData(
-                  { x: 0, y: 0, isPinching: false },
-                  {
-                    display: {
-                      coords: null,
-                      isPinching: false,
-                      handCount: 0,
-                    },
-                  }
-                );
+              } else {
+                const lastPoint = lastValidPointRef.current ?? {
+                  x: useGestureStore.getState().x,
+                  y: useGestureStore.getState().y,
+                };
+                const lostForMs = lostHandSinceRef.current === null ? 0 : now - lostHandSinceRef.current;
+                const shouldRefreshUi =
+                  timeSinceLastUi >= UI_THROTTLE_MS ||
+                  lostForMs <= LOST_HAND_GRACE_MS;
+
+                // Keep the last valid physics coordinate during hand loss.
+                // This prevents Phaser from receiving (0, 0) and moving the
+                // cursor or dragged piece to the top-left corner.
+                if (shouldRefreshUi) {
+                  lastUiUpdateRef.current = now;
+                  setTrackingData(
+                    { x: lastPoint.x, y: lastPoint.y, isPinching: false, isTracked: false },
+                    {
+                      display: {
+                        coords: null,
+                        isPinching: false,
+                        handCount: 0,
+                      },
+                    }
+                  );
+                } else {
+                  setTrackingData({
+                    x: lastPoint.x,
+                    y: lastPoint.y,
+                    isPinching: false,
+                    isTracked: false,
+                  });
+                }
               }
             }
           }
@@ -160,5 +265,5 @@ export function useHandTrackingEngine(videoElement: HTMLVideoElement | null) {
       handLandmarkerRef.current?.close();
       handLandmarkerRef.current = null;
     };
-  }, [videoElement, distance, setStatus, setTrackingData]);
+  }, [videoElement, smoothPoint, updatePinchState, setStatus, setTrackingData]);
 }

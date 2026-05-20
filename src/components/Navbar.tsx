@@ -29,9 +29,17 @@ export default function Navbar() {
         boxSizing: 'border-box',
       }}
     >
-      <div style={{ fontWeight: 'bold', color: '#2F251F', fontSize: '1.25rem', letterSpacing: '1px' }}>
+      <div
+        style={{
+          fontWeight: 'bold',
+          color: '#2F251F',
+          fontSize: '1.35rem',
+          letterSpacing: '1px',
+          fontFamily: '"STXingkai", "华文行楷", "Xingkai SC", "KaiTi", cursive',
+        }}
+      >
         <Link to="/?skipIntro=true" style={{ textDecoration: 'none', color: 'inherit' }}>
-          4C 古建数字化平台
+          古代建筑数字化平台
         </Link>
       </div>
       <div style={{ display: 'flex', gap: '32px' }}>

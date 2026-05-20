@@ -266,7 +266,7 @@ export default function MapPage() {
                     whiteSpace: 'nowrap',
                     opacity: petMoving ? 0.6 : 1
                   }}
-                  onClick={() => !petMoving && navigate('/learn/' + focusedProvinceId)}
+                  onClick={() => !petMoving && navigate('/province/' + focusedProvinceId)}
                 >
                   <span>点击进入 {selectedProvince?.name}</span>
                   <span style={{ fontSize: '12px' }}>→</span>
