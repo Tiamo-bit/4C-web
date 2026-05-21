@@ -5,6 +5,20 @@ import { motion, useInView } from 'framer-motion';
 import { PROVINCE_CONTENT } from '../data/provinces';
 import RevealText from '../components/RevealText';
 import RevealParagraph from '../components/RevealParagraph';
+import PostcardModal from '../components/PostcardModal';
+
+const PHOTO_MODULES = import.meta.glob('../assets/buildings/*/photo.png', {
+  eager: true,
+  query: '?url',
+  import: 'default',
+}) as Record<string, string>;
+
+const PHOTO_URLS = Object.fromEntries(
+  Object.entries(PHOTO_MODULES).map(([path, url]) => {
+    const provinceId = path.match(/buildings\/([^/]+)\/photo\.png$/)?.[1] || '';
+    return [provinceId, url];
+  })
+);
 
 /* 兜底数据 */
 const DEFAULT_CONTENT = {
@@ -23,11 +37,7 @@ const DEFAULT_CONTENT = {
 
 /* 动态获取省份实景图*/
 function getPhotoUrl(id: string): string {
-  try {
-    return new URL(`../assets/buildings/${id}/photo.png`, import.meta.url).href;
-  } catch {
-    return '';
-  }
+  return PHOTO_URLS[id] || '';
 }
 
 /* 章节组件：标题 + 正文 (scroll-triggered) */
@@ -74,6 +84,7 @@ export default function LearnPage() {
   const [progress, setProgress] = useState(0);
   const [fragments, setFragments] = useState<number[]>([]);
   const [bgLoaded, setBgLoaded] = useState(false);
+  const [postcardOpen, setPostcardOpen] = useState(false);
 
   /* 滚动到顶部 */
   useEffect(() => {
@@ -82,6 +93,7 @@ export default function LearnPage() {
 
   /* 预加载背景图 */
   useEffect(() => {
+    setBgLoaded(false);
     if (!photoUrl) return;
     const img = new Image();
     img.src = photoUrl;
@@ -254,12 +266,28 @@ export default function LearnPage() {
             className="learn-btn learn-btn--ghost"
             whileHover={{ scale: 1.04 }}
             whileTap={{ scale: 0.96 }}
+            onClick={() => setPostcardOpen(true)}
+          >
+            生成明信片
+          </motion.button>
+          <motion.button
+            className="learn-btn learn-btn--ghost"
+            whileHover={{ scale: 1.04 }}
+            whileTap={{ scale: 0.96 }}
             onClick={() => navigate('/map')}
           >
             ← 返回地图
           </motion.button>
         </div>
       </motion.footer>
+      {postcardOpen && (
+        <PostcardModal
+          provinceId={id || 'unknown'}
+          content={content}
+          photoUrl={photoUrl}
+          onClose={() => setPostcardOpen(false)}
+        />
+      )}
     </div>
   );
 }
