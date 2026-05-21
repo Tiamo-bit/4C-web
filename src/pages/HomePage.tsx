@@ -254,6 +254,28 @@ const HERO_SECTIONS = [
 
 
 // AI辅助生成： [Qwen3.6-35B-A3B] , 2026-04-17
+type AuthUser = {
+  id: number;
+  username: string;
+  createdAt: string;
+};
+
+type AuthMode = 'login' | 'register';
+
+async function requestAuth(path: string, body?: { username: string; password: string }) {
+  const response = await fetch(path, {
+    method: body ? 'POST' : 'GET',
+    headers: body ? { 'content-type': 'application/json' } : undefined,
+    credentials: 'include',
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data.error || '请求失败，请稍后再试。');
+  }
+  return data as { user: AuthUser | null };
+}
+
 const HubPhase = () => {
   const navigate = useNavigate();
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -263,8 +285,63 @@ const HubPhase = () => {
   const [showMegaMenu, setShowMegaMenu] = useState(false);
   const [showCollection, setShowCollection] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
+  const [authMode, setAuthMode] = useState<AuthMode>('login');
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
+  const [authUsername, setAuthUsername] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [authError, setAuthError] = useState('');
+  const [authLoading, setAuthLoading] = useState(false);
   const [toast, setToast] = useState('');
   const megaMenuTimer = useRef<number | null>(null);
+
+  useEffect(() => {
+    requestAuth('/api/auth/me')
+      .then(data => setAuthUser(data.user))
+      .catch(() => setAuthUser(null));
+  }, []);
+
+  const resetAuthForm = () => {
+    setAuthUsername('');
+    setAuthPassword('');
+    setAuthError('');
+    setAuthLoading(false);
+  };
+
+  const closeLogin = () => {
+    setShowLogin(false);
+    resetAuthForm();
+  };
+
+  const submitAuth = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setAuthError('');
+    setAuthLoading(true);
+
+    try {
+      const path = authMode === 'login' ? '/api/auth/login' : '/api/auth/register';
+      const data = await requestAuth(path, {
+        username: authUsername,
+        password: authPassword,
+      });
+      setAuthUser(data.user);
+      closeLogin();
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : '请求失败，请稍后再试。');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const logout = async () => {
+    try {
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include',
+      });
+    } finally {
+      setAuthUser(null);
+    }
+  };
 
   /* Mega Menu hover 延迟关闭 */
   const openMegaMenu = () => {
@@ -340,9 +417,19 @@ const HubPhase = () => {
             <button className="hub-nav-item" onClick={() => setShowCollection(true)}>
               营造图鉴
             </button>
-            <button className="hub-nav-item" onClick={() => setShowLogin(true)}>
-              营造入卷
-            </button>
+            {authUser ? (
+              <div className="hub-auth-status">
+                <span>{authUser.username}</span>
+                <button type="button" onClick={logout}>退出</button>
+              </div>
+            ) : (
+              <button className="hub-nav-item" onClick={() => {
+                setAuthMode('login');
+                setShowLogin(true);
+              }}>
+                营造入卷
+              </button>
+            )}
           </div>
         </div>
       </nav>
@@ -503,7 +590,7 @@ const HubPhase = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={() => setShowLogin(false)}
+            onClick={closeLogin}
           >
             <motion.div
               className="hub-login-card"
@@ -513,7 +600,7 @@ const HubPhase = () => {
               transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
               onClick={e => e.stopPropagation()}
             >
-              <button className="close-btn" onClick={() => setShowLogin(false)} style={{
+              <button className="close-btn" onClick={closeLogin} style={{
                 position: 'absolute', top: 16, right: 16, width: 36, height: 36,
                 borderRadius: '50%', border: '1px solid rgba(112,84,47,0.2)',
                 background: 'rgba(255,255,255,0.6)', fontSize: 18, cursor: 'pointer',
@@ -521,16 +608,55 @@ const HubPhase = () => {
                 color: '#38291d', fontFamily: 'inherit'
               }}>✕</button>
               <h2>营造入卷</h2>
-              <p>登录以保存你的探索进度与成就</p>
-              <label>
-                用户名
-                <input type="text" placeholder="请输入用户名" />
-              </label>
-              <label>
-                密码
-                <input type="password" placeholder="请输入密码" />
-              </label>
-              <button className="submit-btn">入卷登录</button>
+              <p>{authMode === 'login' ? '登录以记录你的入卷身份' : '创建账号，开启你的营造档案'}</p>
+              <div className="hub-login-tabs" role="tablist" aria-label="登录方式">
+                <button
+                  type="button"
+                  className={authMode === 'login' ? 'is-active' : ''}
+                  onClick={() => {
+                    setAuthMode('login');
+                    setAuthError('');
+                  }}
+                >
+                  登录
+                </button>
+                <button
+                  type="button"
+                  className={authMode === 'register' ? 'is-active' : ''}
+                  onClick={() => {
+                    setAuthMode('register');
+                    setAuthError('');
+                  }}
+                >
+                  注册
+                </button>
+              </div>
+              <form onSubmit={submitAuth}>
+                <label>
+                  用户名
+                  <input
+                    type="text"
+                    value={authUsername}
+                    onChange={event => setAuthUsername(event.target.value)}
+                    placeholder="请输入用户名"
+                    autoComplete="username"
+                  />
+                </label>
+                <label>
+                  密码
+                  <input
+                    type="password"
+                    value={authPassword}
+                    onChange={event => setAuthPassword(event.target.value)}
+                    placeholder="请输入密码"
+                    autoComplete={authMode === 'login' ? 'current-password' : 'new-password'}
+                  />
+                </label>
+                {authError && <div className="hub-login-error">{authError}</div>}
+                <button className="submit-btn" type="submit" disabled={authLoading}>
+                  {authLoading ? '处理中...' : authMode === 'login' ? '入卷登录' : '创建账号'}
+                </button>
+              </form>
             </motion.div>
           </motion.div>
         )}

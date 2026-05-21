@@ -1012,6 +1012,57 @@ body::before {
   font-size: 14px;
 }
 
+.hub-auth-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.hub-auth-status span {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hub-auth-status button,
+.hub-login-tabs button {
+  border: 1px solid rgba(112, 84, 47, 0.18);
+  background: rgba(255, 255, 255, 0.45);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.hub-auth-status button {
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+}
+
+.hub-login-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.hub-login-tabs button {
+  height: 38px;
+  border-radius: 999px;
+  transition: background 180ms ease, color 180ms ease, border-color 180ms ease;
+}
+
+.hub-login-tabs button.is-active {
+  border-color: var(--seal);
+  background: rgba(161, 67, 44, 0.12);
+  color: var(--seal);
+  font-weight: 700;
+}
+
 .hub-login-card label {
   display: grid;
   gap: 6px;
@@ -1056,6 +1107,19 @@ body::before {
 .hub-login-card .submit-btn:hover {
   transform: translateY(-2px);
   filter: brightness(1.05);
+}
+
+.hub-login-card .submit-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+  transform: none;
+}
+
+.hub-login-error {
+  margin: 2px 0 12px;
+  color: #8c2f1f;
+  font-size: 13px;
+  line-height: 1.5;
 }
 
 /* ═══════════════════════════════════════════════════════════
