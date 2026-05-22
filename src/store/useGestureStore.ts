@@ -14,6 +14,7 @@ interface GestureState {
   x: number; // Viewport X (pixels)
   y: number; // Viewport Y (pixels)
   isPinching: boolean;
+  isTracked: boolean;
 
   // ── Low Frequency UI Data (Consumed via standard React useStore) ──
   display: HandDisplayState;
@@ -22,7 +23,7 @@ interface GestureState {
 
   // ── Actions ──
   setTrackingData: (
-    physics: { x: number; y: number; isPinching: boolean },
+    physics: { x: number; y: number; isPinching: boolean; isTracked?: boolean },
     uiUpdate?: { display: HandDisplayState }
   ) => void;
   setStatus: (status: GestureState['status'], error?: string | null) => void;
@@ -33,6 +34,7 @@ export const useGestureStore = create<GestureState>((set) => ({
   x: 0,
   y: 0,
   isPinching: false,
+  isTracked: false,
 
   // Initial UI State
   display: {
@@ -45,11 +47,16 @@ export const useGestureStore = create<GestureState>((set) => ({
 
   // Setters
   setTrackingData: (physics, uiUpdate) =>
-    set((state) => {
+    set(() => {
+      const nextPhysics = {
+        ...physics,
+        isTracked: physics.isTracked ?? true,
+      };
+
       if (uiUpdate) {
-        return { ...physics, ...uiUpdate };
+        return { ...nextPhysics, ...uiUpdate };
       }
-      return { ...physics };
+      return { ...nextPhysics };
     }),
 
   setStatus: (status, error = null) => set({ status, error }),

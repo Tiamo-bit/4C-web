@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { motion, useScroll, useTransform, AnimatePresence, useMotionValue, useSpring } from 'framer-motion';
+import { motion, useScroll, useTransform, AnimatePresence } from 'framer-motion';
 import { useNavigate, useLocation } from 'react-router-dom';
 import RevealParagraph from '../components/RevealParagraph';
 
@@ -132,12 +132,16 @@ const IntroPhase = ({ onEnterHub }: { onEnterHub: () => void }) => {
   // 此部分由团队成员人工撰写
   // 文字显现：用 React state 驱动
   const [textVisible, setTextVisible] = useState(false);
+  const [scrollHintOpacity, setScrollHintOpacity] = useState(1);
   useEffect(() => {
     const unsubscribe = scrollYProgress.on('change', (v) => {
       setTextVisible(v > 0.72);
+      setScrollHintOpacity(Math.max(0, Math.min(1, 1 - v / 0.16)));
     });
     return unsubscribe;
   }, [scrollYProgress]);
+
+  const scrollHintY = useTransform(scrollYProgress, [0, 0.16], [0, 18]);
 
   return (
     <div ref={scrollContainerRef} style={{ width: '100vw', height: '100vh', overflowY: 'scroll', overflowX: 'hidden', position: 'relative', zIndex: 10 }}>
@@ -175,20 +179,15 @@ const IntroPhase = ({ onEnterHub }: { onEnterHub: () => void }) => {
               cursor: 'pointer',
             }}
           >
-            <div style={{
-              color: '#1A1512',
-              fontSize: '54px',
-              fontFamily: '"KaiTi", "STKaiti", "SimSun", serif',
-              fontWeight: 900,
-              letterSpacing: '18px',
-              textShadow: '0 0 16px rgba(255,255,255,0.95), 0 0 40px rgba(255,255,255,0.7), 2px 2px 6px rgba(0,0,0,0.25)',
-              paddingTop: '18px',
-            }}>
-              中国古代建筑
+            <div className="intro-plaque">
+              <div className="intro-plaque__shine" />
+              <div className="intro-plaque__title">
+                中国古代建筑
+              </div>
             </div>
           </div>
 
-          <motion.div style={{ position: 'absolute', bottom: '40px', opacity: useTransform(scrollYProgress, [0, 0.15], [1, 0]), color: '#1A1512', fontWeight: 'bold', fontSize: '1.2rem', letterSpacing: '4px' }}>
+          <motion.div style={{ position: 'absolute', bottom: '40px', opacity: scrollHintOpacity, y: scrollHintY, color: '#1A1512', fontWeight: 'bold', fontSize: '1.2rem', letterSpacing: '4px' }}>
             向下滚动 ↓
           </motion.div>
         </div>
@@ -283,7 +282,6 @@ const HubPhase = () => {
 
   /* ─── 导航状态 ─── */
   const [showMegaMenu, setShowMegaMenu] = useState(false);
-  const [showCollection, setShowCollection] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
   const [authMode, setAuthMode] = useState<AuthMode>('login');
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
@@ -355,37 +353,12 @@ const HubPhase = () => {
   /* 省份点击 */
   const handleProvinceClick = (id: string) => {
     if (HAS_DATA.has(id)) {
-      navigate(`/learn/${id}`);
+      navigate(`/province/${id}`);
     } else {
       setToast('该地区古建筑待发掘');
       setTimeout(() => setToast(''), 2000);
     }
   };
-
-  /* ─── 碎片收集进度 ─── */
-  const [collectedPieces, setCollectedPieces] = useState(0);
-  const totalPieces = 279; // 31 provinces × 9 pieces
-
-  useEffect(() => {
-    let pieces = 0;
-    ALL_PROVINCES.forEach(p => {
-      const fragments = localStorage.getItem(`fragments_${p.id}`);
-      if (fragments) {
-        try { pieces += JSON.parse(fragments).length; } catch { }
-      }
-    });
-    setCollectedPieces(pieces);
-  }, [showCollection]);
-
-  /* 各省完成状态 */
-  const getProvinceCompletion = (id: string) => {
-    const frag = localStorage.getItem(`fragments_${id}`);
-    if (!frag) return 0;
-    try { return JSON.parse(frag).length; } catch { return 0; }
-  };
-
-  /* ─── 视差弹簧 ─── */
-  const springY = useSpring(scrollYProgress, { stiffness: 100, damping: 30, mass: 0.5 });
 
   return (
     <>
@@ -394,7 +367,7 @@ const HubPhase = () => {
         <div className="hub-navbar__inner" style={{ flexDirection: 'column', gap: '4px', padding: '8px 40px' }}>
           {/* 网站主标题 */}
           <span style={{
-            fontFamily: '"Liu Jian Mao Cao", cursive',
+            fontFamily: '"STXingkai", "华文行楷", "Xingkai SC", "Zhi Mang Xing", cursive',
             fontSize: '57px',
             color: '#1A1512',
             letterSpacing: '0.15em',
@@ -413,9 +386,6 @@ const HubPhase = () => {
             </button>
             <button className="hub-nav-item" onClick={() => navigate('/map')}>
               神州沙盘
-            </button>
-            <button className="hub-nav-item" onClick={() => setShowCollection(true)}>
-              营造图鉴
             </button>
             {authUser ? (
               <div className="hub-auth-status">
@@ -535,52 +505,6 @@ const HubPhase = () => {
 
 
       </div>
-
-      {/* 营造图鉴 Overlay */}
-      <AnimatePresence>
-        {showCollection && (
-          <motion.div
-            className="hub-collection-overlay"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setShowCollection(false)}
-          >
-            <motion.div
-              className="hub-collection-panel"
-              initial={{ opacity: 0, scale: 0.92, y: 30 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.92, y: 30 }}
-              transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-              onClick={e => e.stopPropagation()}
-              style={{ position: 'relative' }}
-            >
-              <button className="close-btn" onClick={() => setShowCollection(false)}>✕</button>
-              <h2>营造图鉴</h2>
-              <p style={{ color: '#6a5845', marginBottom: '4px' }}>
-                碎片收集进度：<span style={{ color: '#16A951', fontWeight: 700 }}>{collectedPieces}</span> / {totalPieces}
-              </p>
-              <div className="hub-progress-bar">
-                <div className="hub-progress-fill" style={{ width: `${(collectedPieces / totalPieces) * 100}%` }} />
-              </div>
-
-              <div className="hub-buildings-grid">
-                {ALL_PROVINCES.filter(p => HAS_DATA.has(p.id)).map(p => {
-                  const completed = getProvinceCompletion(p.id);
-                  const isComplete = completed >= 9;
-                  return (
-                    <div key={p.id} className={`hub-building-card ${isComplete ? 'is-complete' : 'is-locked'}`}>
-                      <span style={{ fontSize: '2rem', marginBottom: '6px' }}>{isComplete ? '🏛️' : '🔒'}</span>
-                      <span style={{ fontWeight: 600, color: isComplete ? '#16A951' : '#6a5845' }}>{p.name}</span>
-                      <span style={{ fontSize: '11px', opacity: 0.7 }}>{completed}/9</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* ═══════ 登录弹窗 ═══════ */}
       <AnimatePresence>
@@ -721,9 +645,21 @@ export default function HomePage() {
             {ARCH_POSITIONS.map((item, idx) => (
               <motion.div
                 key={idx}
+                className="intro-ink-term"
                 initial={{ opacity: 0 }} animate={{ opacity: 0.4, y: ['100vh', '-100vh'] }}
                 transition={{ opacity: { duration: 2, ease: "easeOut" }, y: { duration: item.duration, delay: item.delay, repeat: Infinity, ease: 'linear' } }}
-                style={{ position: 'absolute', writingMode: 'vertical-rl', fontFamily: '"Zhi Mang Xing", cursive', fontSize: `${item.size}rem`, color: '#1A1512', filter: `blur(${item.blur}px)`, left: `${item.startX}vw`, textShadow: '2px 4px 10px rgba(26, 21, 18, 0.3)', whiteSpace: 'nowrap' }}
+                style={{
+                  position: 'absolute',
+                  writingMode: 'vertical-rl',
+                  fontFamily: '"STXingkai", "华文行楷", "Xingkai SC", "Zhi Mang Xing", cursive',
+                  fontSize: `${item.size}rem`,
+                  color: '#1A1512',
+                  filter: `blur(${item.blur}px)`,
+                  left: `${item.startX}vw`,
+                  textShadow: '2px 4px 10px rgba(26, 21, 18, 0.3)',
+                  whiteSpace: 'nowrap',
+                  fontWeight: 500,
+                }}
               >
                 {item.term}
               </motion.div>

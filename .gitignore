@@ -1,3 +1,12 @@
 node_modules
 data/*.sqlite
 data/*.sqlite-*
+dist/
+*.tsbuildinfo
+.wrangler/
+.env
+.env.*
+.dev.vars
+.dev.vars.*
+!.env.example
+!.dev.vars.example

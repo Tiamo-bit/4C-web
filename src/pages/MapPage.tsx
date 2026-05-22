@@ -1,4 +1,5 @@
-import React, { useState, useMemo, useRef, CSSProperties, useEffect } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
+import type { CSSProperties } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 
@@ -266,7 +267,7 @@ export default function MapPage() {
                     whiteSpace: 'nowrap',
                     opacity: petMoving ? 0.6 : 1
                   }}
-                  onClick={() => !petMoving && navigate('/learn/' + focusedProvinceId)}
+                  onClick={() => !petMoving && navigate('/province/' + focusedProvinceId)}
                 >
                   <span>点击进入 {selectedProvince?.name}</span>
                   <span style={{ fontSize: '12px' }}>→</span>

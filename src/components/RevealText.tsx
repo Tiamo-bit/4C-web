@@ -1,5 +1,5 @@
 // AI辅助生成： [你的AI模型] , 2026-04-02
-import React, { useRef } from 'react';
+import { useRef } from 'react';
 import { motion, useInView } from 'framer-motion';
 
 export default function RevealText({ text, delay = 0 }: { text: string; delay?: number }) {

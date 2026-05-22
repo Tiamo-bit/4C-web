@@ -1,4 +1,3 @@
-import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 
 const PROVINCE_INFO: Record<string, { name: string, arch: string, desc: string }> = {

@@ -1,20 +1,42 @@
 import * as Phaser from 'phaser';
+import { getBuildingAssetKey, PRIMARY_BUILDING_ID } from '../../data/provinceBuildings';
 import { useGestureStore } from '../../store/useGestureStore';
 
 // Import all province puzzle images statically so Vite can resolve them
-const puzzleModules = import.meta.glob('../../assets/buildings/*/puzzle.png', { eager: true, import: 'default' }) as Record<string, string>;
+const puzzleModules = import.meta.glob('../../assets/buildings/**/puzzle.png', { eager: true, import: 'default' }) as Record<string, string>;
 
-function getPuzzleUrl(provinceId: string): string {
-  // Keys look like "../../assets/buildings/beijing/puzzle.png"
-  const key = `../../assets/buildings/${provinceId}/puzzle.png`;
-  return puzzleModules[key] || '';
+const puzzleUrls = Object.fromEntries(
+  Object.entries(puzzleModules).map(([path, url]) => {
+    const match = path.match(/buildings\/([^/]+)(?:\/([^/]+))?\/puzzle\.png$/);
+    const assetKey = match ? getBuildingAssetKey(match[1], match[2] || PRIMARY_BUILDING_ID) : '';
+    return [assetKey, url];
+  })
+);
+
+function getPuzzleUrl(assetKey: string): string {
+  return puzzleUrls[assetKey] || '';
+}
+
+function getPuzzleAssetKeyFromLocation(): string {
+  if (typeof window === 'undefined') return '';
+  const match = window.location.pathname.match(/\/puzzle\/([^/?#]+)(?:\/([^/?#]+))?/);
+  const provinceId = match?.[1] ? decodeURIComponent(match[1]) : '';
+  const buildingId = match?.[2] ? decodeURIComponent(match[2]) : PRIMARY_BUILDING_ID;
+  return provinceId ? getBuildingAssetKey(provinceId, buildingId) : '';
+}
+
+function getScenePuzzleAssetKey(scene: Phaser.Scene): string {
+  const registryId = scene.registry.get('puzzleAssetKey');
+  if (typeof registryId === 'string' && registryId) return registryId;
+  return getPuzzleAssetKeyFromLocation() || getBuildingAssetKey('beijing');
 }
 
 // Fallback to test-building if province puzzle not found
 import testBuildingUrl from '../../assets/buildings/test-building.png';
 
 const GRID = 3;        // 3×3 = 9 pieces
-const SCALE_FACTOR = 1; // 原始尺寸
+const GESTURE_FOLLOW_ALPHA = 0.55;
+const LOST_GESTURE_RELEASE_MS = 220;
 
 export class PuzzleScene extends Phaser.Scene {
   private draggedPiece: Phaser.GameObjects.Image | null = null;
@@ -23,6 +45,11 @@ export class PuzzleScene extends Phaser.Scene {
   private wasPinching = false;
   private worldX = 0;
   private worldY = 0;
+  private targetWorldX = 0;
+  private targetWorldY = 0;
+  private hasGesturePosition = false;
+  private isGestureTracked = false;
+  private lostGestureAt = 0;
   private unsubscribeStore: (() => void) | null = null;
   private debugCursor!: Phaser.GameObjects.Graphics;
   private cursorTween!: Phaser.Tweens.Tween;
@@ -32,8 +59,8 @@ export class PuzzleScene extends Phaser.Scene {
   }
 
   preload() {
-    const provinceId = this.registry.get('provinceId') || 'beijing';
-    const puzzleUrl = getPuzzleUrl(provinceId);
+    const puzzleAssetKey = getScenePuzzleAssetKey(this);
+    const puzzleUrl = getPuzzleUrl(puzzleAssetKey);
     const imageUrl = puzzleUrl || testBuildingUrl;
     this.load.image('puzzle-source', imageUrl);
   }
@@ -125,9 +152,10 @@ export class PuzzleScene extends Phaser.Scene {
       if (
         state.x !== prevState.x ||
         state.y !== prevState.y ||
-        state.isPinching !== prevState.isPinching
+        state.isPinching !== prevState.isPinching ||
+        state.isTracked !== prevState.isTracked
       ) {
-        this.handleGestureUpdate(state.x, state.y, state.isPinching);
+        this.handleGestureUpdate(state.x, state.y, state.isPinching, state.isTracked);
       }
     });
 
@@ -167,11 +195,29 @@ export class PuzzleScene extends Phaser.Scene {
   }
 
   update() {
-    // Continuous drag follows the hand's world coordinates
+    if (!this.isGestureTracked && this.wasPinching && this.lostGestureAt > 0) {
+      const lostForMs = this.time.now - this.lostGestureAt;
+      if (lostForMs >= LOST_GESTURE_RELEASE_MS) {
+        this.releaseDraggedPiece();
+        this.wasPinching = false;
+      }
+    }
+
+    // The gesture engine already filters raw input. This lightweight scene
+    // interpolation keeps pieces from visually snapping on any remaining jump.
+    if (this.hasGesturePosition) {
+      this.worldX = Phaser.Math.Linear(this.worldX, this.targetWorldX, GESTURE_FOLLOW_ALPHA);
+      this.worldY = Phaser.Math.Linear(this.worldY, this.targetWorldY, GESTURE_FOLLOW_ALPHA);
+    }
+
+    // Continuous drag follows the filtered hand world coordinates
     if (this.draggedPiece) {
       this.draggedPiece.setPosition(this.worldX, this.worldY);
     }
     if (this.debugCursor) {
+      const isInLostGrace =
+        this.lostGestureAt > 0 && this.time.now - this.lostGestureAt < LOST_GESTURE_RELEASE_MS;
+      this.debugCursor.setVisible(this.isGestureTracked || this.lostGestureAt === 0 || isInLostGrace);
       this.debugCursor.setPosition(this.worldX, this.worldY);
     }
   }
@@ -181,9 +227,37 @@ export class PuzzleScene extends Phaser.Scene {
   /* ------------------------------------------------------------------ */
 
   // AI辅助优化： [你的AI模型] , 2026-04-20
-  private handleGestureUpdate(viewportX: number, viewportY: number, isPinching: boolean) {
+  private handleGestureUpdate(
+    viewportX: number,
+    viewportY: number,
+    isPinching: boolean,
+    isTracked = true
+  ) {
     // Guard: scene may not be fully ready or may be shutting down
     if (!this.cameras || !this.cameras.main || !this.game || !this.game.canvas) return;
+
+    if (!isTracked) {
+      if (this.isGestureTracked || this.lostGestureAt === 0) {
+        this.lostGestureAt = this.time.now;
+      }
+      this.isGestureTracked = false;
+      return;
+    }
+
+    const resumedFromShortLoss =
+      !this.isGestureTracked &&
+      this.lostGestureAt > 0 &&
+      this.time.now - this.lostGestureAt < LOST_GESTURE_RELEASE_MS;
+
+    // Pinch debouncing needs a couple frames after tracking resumes. Preserve
+    // an active drag for that first frame so a brief landmark drop is not a drop.
+    if (resumedFromShortLoss && this.wasPinching && !isPinching) {
+      isPinching = true;
+    }
+
+    this.isGestureTracked = true;
+    this.lostGestureAt = 0;
+    this.debugCursor?.setVisible(true);
 
     // 1. Convert Viewport to World Coordinates
     const canvas = this.game.canvas;
@@ -196,8 +270,14 @@ export class PuzzleScene extends Phaser.Scene {
     const canvasY = (viewportY - canvasRect.top) * scaleY;
 
     const worldPoint = this.cameras.main.getWorldPoint(canvasX, canvasY);
-    this.worldX = worldPoint.x;
-    this.worldY = worldPoint.y;
+    this.targetWorldX = worldPoint.x;
+    this.targetWorldY = worldPoint.y;
+
+    if (!this.hasGesturePosition) {
+      this.worldX = worldPoint.x;
+      this.worldY = worldPoint.y;
+      this.hasGesturePosition = true;
+    }
 
     // 2. Pinch Start (Grab)
     if (isPinching && !this.wasPinching) {
@@ -209,7 +289,7 @@ export class PuzzleScene extends Phaser.Scene {
           if (piece.getData('isLocked') || piece.getData('isSnapping')) continue;
 
           const bounds = piece.getBounds();
-          if (Phaser.Geom.Rectangle.Contains(bounds, this.worldX, this.worldY)) {
+          if (Phaser.Geom.Rectangle.Contains(bounds, this.targetWorldX, this.targetWorldY)) {
             this.draggedPiece = piece;
             piece.setDepth(10); // Bring to front
             piece.setScale(this.fitScale * 1.1); // Visual lift
@@ -235,73 +315,70 @@ export class PuzzleScene extends Phaser.Scene {
 
     // 3. Pinch End (Release)
     if (!isPinching && this.wasPinching) {
-      if (this.draggedPiece) {
-        const piece = this.draggedPiece;
-
-        piece.setScale(this.fitScale);
-        piece.setAlpha(1);
-        piece.setDepth(5);
-
-        // Snap to grid logic
-        const targetX = piece.getData('targetX');
-        const targetY = piece.getData('targetY');
-        const dist = Phaser.Math.Distance.Between(piece.x, piece.y, targetX, targetY);
-
-        const SNAP_THRESHOLD = 80;
-
-        if (dist <= SNAP_THRESHOLD) {
-          piece.setData('isSnapping', true);
-
-          this.tweens.add({
-            targets: piece,
-            x: targetX,
-            y: targetY,
-            duration: 200,
-            ease: 'Back.easeOut',
-            onComplete: () => {
-              piece.disableInteractive();
-              piece.setData('isLocked', true);
-              piece.setData('isSnapping', false);
-
-              // Subtly flash to confirm successful placement
-              this.tweens.add({
-                targets: piece,
-                scaleX: this.fitScale * 1.05,
-                scaleY: this.fitScale * 1.05,
-                yoyo: true,
-                duration: 150,
-                ease: 'Sine.easeInOut',
-                onComplete: () => {
-                  piece.setScale(this.fitScale);
-                  this.checkCompletion();
-                }
-              });
-            }
-          });
-        }
-
-        this.draggedPiece = null;
-      }
-
-      // Cursor transition: Unpinched (restore large breathing red halo)
-      this.drawCursorRing(0xff0000, 20);
-      this.startBreathing();
+      this.releaseDraggedPiece();
     }
 
     this.wasPinching = isPinching;
+  }
+
+  private releaseDraggedPiece() {
+    if (this.draggedPiece) {
+      const piece = this.draggedPiece;
+
+      piece.setScale(this.fitScale);
+      piece.setAlpha(1);
+      piece.setDepth(5);
+
+      // Snap to grid logic
+      const targetX = piece.getData('targetX');
+      const targetY = piece.getData('targetY');
+      const dist = Phaser.Math.Distance.Between(piece.x, piece.y, targetX, targetY);
+
+      const SNAP_THRESHOLD = 80;
+
+      if (dist <= SNAP_THRESHOLD) {
+        piece.setData('isSnapping', true);
+
+        this.tweens.add({
+          targets: piece,
+          x: targetX,
+          y: targetY,
+          duration: 200,
+          ease: 'Back.easeOut',
+          onComplete: () => {
+            piece.disableInteractive();
+            piece.setData('isLocked', true);
+            piece.setData('isSnapping', false);
+
+            // Subtly flash to confirm successful placement
+            this.tweens.add({
+              targets: piece,
+              scaleX: this.fitScale * 1.05,
+              scaleY: this.fitScale * 1.05,
+              yoyo: true,
+              duration: 150,
+              ease: 'Sine.easeInOut',
+              onComplete: () => {
+                piece.setScale(this.fitScale);
+                this.checkCompletion();
+              }
+            });
+          }
+        });
+      }
+
+      this.draggedPiece = null;
+    }
+
+    // Cursor transition: Unpinched (restore large breathing red halo)
+    this.drawCursorRing(0xff0000, 20);
+    this.startBreathing();
   }
 
   private checkCompletion() {
     const allLocked = this.puzzlePieces.every(p => p.getData('isLocked'));
     if (allLocked) {
       this.events.emit('PuzzleCompleted');
-      console.log(`Puzzle Completed! All ${GRID * GRID} pieces locked.`);
-
-      // Save completion to localStorage
-      const provinceId = this.registry.get('provinceId') || 'beijing';
-      const fragments = Array.from({ length: GRID * GRID }, (_, i) => i);
-      localStorage.setItem(`fragments_${provinceId}`, JSON.stringify(fragments));
-      localStorage.setItem(`learn_progress_${provinceId}`, '100');
 
       // Celebratory glow
       this.puzzlePieces.forEach(p => {

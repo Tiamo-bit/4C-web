@@ -1,6 +1,6 @@
 import express from 'express';
 import { randomBytes, pbkdf2Sync, timingSafeEqual } from 'node:crypto';
-import { mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
@@ -9,6 +9,9 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = join(__dirname, '..');
 const dataDir = join(rootDir, 'data');
 mkdirSync(dataDir, { recursive: true });
+
+loadLocalEnv(join(rootDir, '.env'));
+loadLocalEnv(join(rootDir, '.dev.vars'));
 
 const db = new DatabaseSync(join(dataDir, 'auth.sqlite'));
 db.exec(`
@@ -26,14 +29,61 @@ db.exec(`
     expires_at TEXT NOT NULL,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
   );
+
+  CREATE TABLE IF NOT EXISTS comments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    province_id TEXT NOT NULL,
+    user_id INTEGER,
+    author_name TEXT NOT NULL,
+    content TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_comments_province_id_created_at
+    ON comments (province_id, created_at DESC);
 `);
 
 const app = express();
 const PORT = Number(process.env.PORT || 4174);
 const USERNAME_PATTERN = /^[\p{L}\p{N}_-]{2,24}$/u;
+const PROVINCE_ID_PATTERN = /^[a-z0-9_-]{1,48}$/i;
 const SESSION_DAYS = 7;
+const MAX_COMMENT_LENGTH = 500;
+const COMMENT_LIMIT = 100;
+const MAX_CHAT_MESSAGE_LENGTH = 1000;
+const MAX_CHAT_CONTEXT_FIELD_LENGTH = 2400;
+const MAX_CHAT_MESSAGES = 10;
+const DEFAULT_AI_BASE_URL = 'https://api.deepseek.com';
+const DEFAULT_AI_MODEL = 'deepseek-v4-flash';
 
 app.use(express.json({ limit: '10kb' }));
+
+function loadLocalEnv(filePath) {
+  if (!existsSync(filePath)) return;
+
+  const lines = readFileSync(filePath, 'utf8').split(/\r?\n/);
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+
+    const index = trimmed.indexOf('=');
+    if (index === -1) continue;
+
+    const key = trimmed.slice(0, index).trim();
+    let value = trimmed.slice(index + 1).trim();
+    if (!key || process.env[key] !== undefined) continue;
+
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1);
+    }
+
+    process.env[key] = value;
+  }
+}
 
 function parseCookies(header = '') {
   return Object.fromEntries(
@@ -68,6 +118,17 @@ function publicUser(user) {
     id: user.id,
     username: user.username,
     createdAt: user.created_at,
+  };
+}
+
+function publicComment(comment) {
+  return {
+    id: comment.id,
+    provinceId: comment.province_id,
+    userId: comment.user_id ?? null,
+    authorName: comment.author_name,
+    content: comment.content,
+    createdAt: comment.created_at,
   };
 }
 
@@ -121,6 +182,142 @@ function validateCredentials(usernameInput, passwordInput) {
   return { username, password };
 }
 
+function validateProvinceId(value) {
+  const provinceId = String(value || '').trim();
+  if (!PROVINCE_ID_PATTERN.test(provinceId)) {
+    return { error: '省份参数无效。' };
+  }
+  return { provinceId };
+}
+
+function validateCommentContent(value) {
+  const content = String(value || '').trim();
+  if (!content) {
+    return { error: '评论内容不能为空。' };
+  }
+  if (content.length > MAX_COMMENT_LENGTH) {
+    return { error: `评论请控制在 ${MAX_COMMENT_LENGTH} 字以内。` };
+  }
+  return { content };
+}
+
+function truncateText(value, maxLength) {
+  return value.length > maxLength ? `${value.slice(0, maxLength)}...` : value;
+}
+
+function isRecord(value) {
+  return typeof value === 'object' && value !== null;
+}
+
+function parseChatMessages(value) {
+  if (!Array.isArray(value)) return null;
+
+  const messages = value
+    .filter(isRecord)
+    .map(item => ({
+      role: item.role,
+      content: item.content,
+    }))
+    .filter(item =>
+      (item.role === 'user' || item.role === 'assistant') &&
+      typeof item.content === 'string' &&
+      item.content.trim().length > 0
+    )
+    .map(item => ({
+      role: item.role,
+      content: truncateText(item.content.trim(), MAX_CHAT_MESSAGE_LENGTH),
+    }))
+    .slice(-MAX_CHAT_MESSAGES);
+
+  return messages.length > 0 ? messages : null;
+}
+
+function parseChatContext(value) {
+  if (!isRecord(value)) return null;
+
+  const { provinceName, archName, card, sections } = value;
+  if (
+    typeof provinceName !== 'string' ||
+    typeof archName !== 'string' ||
+    typeof card !== 'string' ||
+    !Array.isArray(sections)
+  ) {
+    return null;
+  }
+
+  const parsedSections = sections
+    .filter(isRecord)
+    .map(section => ({
+      title: typeof section.title === 'string' ? section.title : '',
+      body: typeof section.body === 'string' ? section.body : '',
+    }))
+    .filter(section => section.title.trim() && section.body.trim())
+    .slice(0, 6)
+    .map(section => ({
+      title: truncateText(section.title.trim(), 120),
+      body: truncateText(section.body.trim(), MAX_CHAT_CONTEXT_FIELD_LENGTH),
+    }));
+
+  if (!provinceName.trim() || !archName.trim() || parsedSections.length === 0) {
+    return null;
+  }
+
+  return {
+    provinceName: truncateText(provinceName.trim(), 80),
+    archName: truncateText(archName.trim(), 120),
+    card: truncateText(card.trim(), MAX_CHAT_CONTEXT_FIELD_LENGTH),
+    sections: parsedSections,
+  };
+}
+
+function buildChatSystemPrompt(context) {
+  const sectionText = context.sections
+    .map(section => `【${section.title}】${section.body}`)
+    .join('\n');
+
+  return [
+    '你叫“榫灵”，是一个中国古代建筑科普小助手。',
+    '回答要简洁、准确、适合普通用户阅读。优先结合当前页面的建筑资料回答。',
+    '如果用户问题超出当前资料，可以用通俗方式补充相关古建筑常识，但不要编造具体史实。',
+    '当前页面资料：',
+    `省份/地区：${context.provinceName}`,
+    `建筑：${context.archName}`,
+    `建筑名片：${context.card}`,
+    `章节资料：\n${sectionText}`,
+  ].join('\n');
+}
+
+async function callOpenAICompatibleProvider({ apiKey, baseUrl, model, messages, context }) {
+  const endpoint = baseUrl.replace(/\/+$/, '');
+  const response = await fetch(`${endpoint}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model,
+      temperature: 0.4,
+      messages: [
+        { role: 'system', content: buildChatSystemPrompt(context) },
+        ...messages,
+      ],
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Provider request failed with ${response.status}`);
+  }
+
+  const payload = await response.json();
+  const content = payload?.choices?.[0]?.message?.content;
+  if (typeof content !== 'string' || !content.trim()) {
+    throw new Error('Provider returned no message');
+  }
+
+  return content.trim();
+}
+
 app.get('/api/auth/me', (req, res) => {
   const user = getCurrentUser(req);
   res.json({ user: user ? publicUser(user) : null });
@@ -165,15 +362,84 @@ app.post('/api/auth/login', (req, res) => {
   res.json({ user: publicUser(user) });
 });
 
+app.get('/api/comments', (req, res) => {
+  const province = validateProvinceId(req.query.provinceId);
+  if (province.error) return res.status(400).json({ error: province.error });
+
+  const comments = db.prepare(`
+    SELECT id, province_id, user_id, author_name, content, created_at
+    FROM comments
+    WHERE province_id = ?
+    ORDER BY datetime(created_at) DESC, id DESC
+    LIMIT ?
+  `).all(province.provinceId, COMMENT_LIMIT);
+
+  res.json({ comments: comments.map(publicComment) });
+});
+
+app.post('/api/comments', (req, res) => {
+  const province = validateProvinceId(req.body?.provinceId);
+  if (province.error) return res.status(400).json({ error: province.error });
+
+  const comment = validateCommentContent(req.body?.content);
+  if (comment.error) return res.status(400).json({ error: comment.error });
+
+  const user = getCurrentUser(req);
+  const result = db.prepare(`
+    INSERT INTO comments (province_id, user_id, author_name, content)
+    VALUES (?, ?, ?, ?)
+  `).run(province.provinceId, user?.id ?? null, user?.username ?? '游客', comment.content);
+
+  const savedComment = db.prepare(`
+    SELECT id, province_id, user_id, author_name, content, created_at
+    FROM comments
+    WHERE id = ?
+  `).get(result.lastInsertRowid);
+
+  res.status(201).json({ comment: publicComment(savedComment) });
+});
+
+app.post('/api/chat', async (req, res) => {
+  const messages = parseChatMessages(req.body?.messages);
+  const context = parseChatContext(req.body?.context);
+
+  if (!messages || !context) {
+    return res.status(400).json({ error: 'Missing or invalid messages/context' });
+  }
+
+  if (!process.env.AI_API_KEY) {
+    return res.status(500).json({ error: 'AI assistant is not configured' });
+  }
+
+  try {
+    const message = await callOpenAICompatibleProvider({
+      apiKey: process.env.AI_API_KEY,
+      baseUrl: process.env.AI_BASE_URL || DEFAULT_AI_BASE_URL,
+      model: process.env.AI_MODEL || DEFAULT_AI_MODEL,
+      messages,
+      context,
+    });
+
+    res.json({ message });
+  } catch (error) {
+    console.error('AI provider error', error instanceof Error ? error.message : error);
+    res.status(500).json({ error: 'Provider error' });
+  }
+});
+
 app.use('/api', (req, res) => {
   res.status(404).json({ error: 'Not found' });
 });
 
 app.use((error, req, res, next) => {
+  if (error?.type === 'entity.parse.failed') {
+    return res.status(400).json({ error: 'Invalid JSON body' });
+  }
+
   console.error(error);
   res.status(500).json({ error: 'Server error' });
 });
 
 app.listen(PORT, () => {
-  console.log(`Auth API listening on http://localhost:${PORT}`);
+  console.log(`API listening on http://localhost:${PORT}`);
 });

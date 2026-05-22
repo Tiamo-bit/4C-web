@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import { useRef } from 'react';
 import { motion, useInView, Variants } from 'framer-motion';
 
 export default function RevealParagraph({ text, fontSize = '1.7rem' }: { text: string, fontSize?: string }) {

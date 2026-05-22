@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import React, {
+import {
   forwardRef,
   useEffect,
   useImperativeHandle,
@@ -333,7 +333,7 @@ class PetMapScene extends Phaser.Scene {
     const targetY = target.y - 34;
     const arcHeight = -42;
 
-      this.tweens.addCounter({
+    this.tweens.addCounter({
       from: 0,
       to: 1,
       duration: 620,
