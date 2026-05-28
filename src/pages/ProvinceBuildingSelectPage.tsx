@@ -47,7 +47,9 @@ async function requestComments(provinceId: string) {
   if (!response.ok) {
     throw new Error(data.error || '评论加载失败，请稍后再试。');
   }
-  return data as { comments: PersistedComment[] };
+  return {
+    comments: Array.isArray(data.comments) ? (data.comments as PersistedComment[]) : [],
+  };
 }
 
 async function createComment(provinceId: string, content: string) {
@@ -60,6 +62,9 @@ async function createComment(provinceId: string, content: string) {
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
     throw new Error(data.error || '评论提交失败，请稍后再试。');
+  }
+  if (!data.comment || typeof data.comment !== 'object') {
+    throw new Error('评论服务返回格式异常，请稍后再试。');
   }
   return data as { comment: PersistedComment };
 }
@@ -232,3 +237,4 @@ export default function ProvinceBuildingSelectPage() {
     </main>
   );
 }
+
