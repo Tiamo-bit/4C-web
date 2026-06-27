@@ -5,13 +5,20 @@ import {
   getProvinceBuildingGroup,
   PRIMARY_BUILDING_ID,
 } from '../data/provinceBuildings';
-import neimengguMapUrl from '../assets/province-maps/neimenggu.jpg';
-import sichuanMapUrl from '../assets/province-maps/sichuan.png';
 
-const provinceMapUrls: Record<string, string> = {
-  neimenggu: neimengguMapUrl,
-  sichuan: sichuanMapUrl,
-};
+const provinceMapModules = import.meta.glob('../assets/province-maps/*.{png,jpg,jpeg}', {
+  eager: true,
+  import: 'default',
+}) as Record<string, string>;
+
+const provinceMapUrls = Object.entries(provinceMapModules).reduce<Record<string, string>>(
+  (urls, [path, url]) => {
+    const match = path.match(/province-maps\/([^/]+)\.(?:png|jpe?g)$/);
+    if (match) urls[match[1]] = url;
+    return urls;
+  },
+  {}
+);
 
 const provincePhotoModules = import.meta.glob('../assets/buildings/**/photo.png', {
   eager: true,
@@ -154,7 +161,7 @@ export default function ProvinceBuildingSelectPage() {
             <div className="province-branch-visual__copy">
               <span>当前省份</span>
               <h1 id="province-branch-title">{group.provinceName}</h1>
-              <p>从地图进入后，该省份在这里被放大展示。后续可替换为省份轮廓、地图切片或专属插画素材。</p>
+              <p>沿省域图景进入代表建筑，继续探索当地传统营造智慧。</p>
             </div>
           </aside>
 
@@ -237,4 +244,3 @@ export default function ProvinceBuildingSelectPage() {
     </main>
   );
 }
-
