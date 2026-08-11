@@ -67,6 +67,48 @@ function validateCommentContent(value: unknown) {
   return content;
 }
 
+function parseCookies(header = '') {
+  return Object.fromEntries(
+    header
+      .split(';')
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .map((part) => {
+        const index = part.indexOf('=');
+        if (index === -1) return [part, ''];
+        return [part.slice(0, index), decodeURIComponent(part.slice(index + 1))];
+      }),
+  );
+}
+
+async function getCommentAuthor(request: Request, db: D1Database) {
+  const token = parseCookies(request.headers.get('cookie') || '').auth_token;
+  if (!token) return { userId: null, authorName: '游客' };
+
+  try {
+    const now = new Date().toISOString();
+    await db.prepare('DELETE FROM sessions WHERE expires_at <= ?').bind(now).run();
+
+    const user = await db
+      .prepare(
+        `
+          SELECT users.id, users.username
+          FROM sessions
+          JOIN users ON users.id = sessions.user_id
+          WHERE sessions.token = ? AND sessions.expires_at > ?
+        `,
+      )
+      .bind(token, now)
+      .first<{ id: number; username: string }>();
+
+    if (user) return { userId: user.id, authorName: user.username };
+  } catch (error) {
+    console.warn('Comment author lookup skipped', error instanceof Error ? error.message : error);
+  }
+
+  return { userId: null, authorName: '游客' };
+}
+
 async function handleGet(request: Request, db: D1Database) {
   const provinceId = getProvinceId(request);
   if (!provinceId) return jsonResponse({ error: 'Invalid provinceId' }, 400);
@@ -101,13 +143,13 @@ async function handlePost(request: Request, db: D1Database) {
   const content = validateCommentContent(body.content);
   if (!content) return jsonResponse({ error: 'Comment content must be 1-500 characters' }, 400);
 
-  const authorName = '游客';
+  const { userId, authorName } = await getCommentAuthor(request, db);
   const result = await db
     .prepare(`
       INSERT INTO comments (province_id, user_id, author_name, content)
       VALUES (?, ?, ?, ?)
     `)
-    .bind(provinceId, null, authorName, content)
+    .bind(provinceId, userId, authorName, content)
     .run();
 
   const savedComment = await db
